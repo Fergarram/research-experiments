@@ -91,6 +91,7 @@ pub fn main() !void {
     print("Cell Size: {d} bytes\n", .{@sizeOf(Cell)});
     print("Potential Size: {} KB\n\n", .{(10000 * @sizeOf(Cell)) / 1024});
 
+    // This for loop is a single step
     for (cellPtrList.items) |cellPtr| {
         if (cellPtr.* != null) {
             const topleft = getCellPtr(cellPtr.*.?.neighbors[0]);
@@ -110,7 +111,24 @@ pub fn main() !void {
             // 4. If my neighbors think they are part of a heading, then it reasurres
             //    me that I'm a heading as well.
 
+            // What are all the necessary conditions for a character of a certain type to be a part of a heading 1?
+
+            // MUSTS for HEADING START:
+            // 1. Be a '#'
+            // 2. Left neighbor is '#', null or (user mistake) space
+            // 3. Right neighbor is '#' or space or (user mistake) alphanumeric
+
+            // REINFORCEMENTS for HEADING START:
+            // 1. Horizontal neighbors think they're part of a heading or heading start
+
+            // REINFORCEMENTS for HEADING:
+            // 1. Empty lines above or below the heading line
+            // 2. Usually short line
+
+            // It seems that I might be needing multiple layers and that memory will be used more often than not.
+
             // NOTES:
+
             // * How much does it increase in activation with each rule?
             // * Could it be that the amount of rules and their conclusions define 
             //   the amount of activation it will have?
@@ -118,30 +136,33 @@ pub fn main() !void {
             // * Can there be an algorithm that defines the amount of activation a set of 
             //   rules would result in?
 
+            // Priority Character Types
+            // '#', '-', '~', '[..]', '>', '`', '(..)', ' ', '!', '*', '_', '0..9', '.'
+
             if (cellPtr.*.?.value == '#') {
-                cellPtr.*.?.tendencies[0] = 0.25;
+                cellPtr.*.?.tendencies[0] = 0.25; // Why 25%? is there a way to calculate this value? Maybe based on the posibilities of each character?
                 cellPtr.*.?.tendencies[1] = 0.25;
                 cellPtr.*.?.tendencies[2] = 0.25;
                 cellPtr.*.?.tendencies[3] = 0.25;
                 cellPtr.*.?.tendencies[4] = 0.25;
                 cellPtr.*.?.tendencies[5] = 0.25;
-            }
 
-            if (right.* != null and right.*.?.value == ' ') {
-                cellPtr.*.?.tendencies[0] = 0.9;
-                cellPtr.*.?.tendencies[1] = 0;
-                cellPtr.*.?.tendencies[2] = 0;
-                cellPtr.*.?.tendencies[3] = 0;
-                cellPtr.*.?.tendencies[4] = 0;
-                cellPtr.*.?.tendencies[5] = 0;
+                if (right.* != null and right.*.?.value == ' ') {
+                    cellPtr.*.?.tendencies[0] = 0.9;
+                    cellPtr.*.?.tendencies[1] = 0;
+                    cellPtr.*.?.tendencies[2] = 0;
+                    cellPtr.*.?.tendencies[3] = 0;
+                    cellPtr.*.?.tendencies[4] = 0;
+                    cellPtr.*.?.tendencies[5] = 0;
+                }
             }
         }
-
-        // @TODO: Export a JSON file with the state of each cell so that I can analyze it and visualize it in each generation or step.
-    
-        // Extra points: Create a websocket endpoint that serves this JSON: 
-        // developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
     }
+
+    // @TODO: Export a JSON file with the state of each cell so that I can analyze it and visualize it in each generation or step.
+    
+    // Extra points: Create a websocket endpoint that serves this JSON: 
+    // developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 
     //
     // Loop to query each cell in terminal
