@@ -4,11 +4,13 @@ This is one of those projects which are born after a burst of excitement but you
 finishing it, to the #uncomfortable point were it isn’t good enough to publish but it is 
 good enough to talk about it.
 
+Some inlined `code` here.
+
 So, in this series I will share with you how I retake this project and finish it to the MVP 
 point in ~two weekends~!
 
 ## What the project is about
-I bought a banana phone after watching some video about this (I don’t remember exactly what 
+I bought a _banana phone_ after watching some video about this (I don’t remember exactly what 
 video it was). The fact that I could create apps for a feature phone using web technologies 
 blew my mind — I remember being a kid and creating what we now call “feature phones” using 
 small and thin wood rectangles that (for some strange reason) were laying around in my 
@@ -19,7 +21,7 @@ app running.
 
 A few months past by and suddenly decided I wanted to do something with it. I though of 
 remaking [a game I made](https://fergarram.itch.io/amateur-archaeology-iii) for a game jam 
-some years ago using Game Maker.  This was the perfect idea, the game was simple enough so 
+some years ago using Game Maker. This was the perfect idea, the game was simple enough so 
 I started on working on it.
 
 ## Defining the MVP

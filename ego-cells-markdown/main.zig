@@ -13,9 +13,32 @@ const Block = enum {
     STRIKE,
     LINK,
     CODE_SNIPPET,
-    BLOCKQUOTE,
+    QUOTE,
     // NOTE: Tables are not part of MD but would be interesting
     //       https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet#tables
+};
+
+const Tokens = enum {
+    HEADING_START,
+    MONO_TICK,
+    UNDERLINE_START,
+    UNDERLINE_END,
+    BOLD_START,
+    BOLD_END,
+    ITALIC_START,
+    ITALIC_END,
+    STRIKE_START,
+    STRIKE_END,
+    LINK_CONTENT_START,
+    LINK_CONTENT_END,
+    LINK_URL_START,
+    LINK_URL_END,
+    SNIPPET_START,
+    SNIPPET_END,
+    SNIPPET_CONTENT,
+    QUOTE_START,
+    CONTENT,
+    UNKOWN
 };
 
 const Point = struct {
@@ -31,10 +54,9 @@ const Cell = struct {
     x: i32,
     y: i32,
 
-    value: u8 = undefined,
+    input: u8 = undefined,
 
-    // For each Block type a cell can have a % of identification with being part of the block. The order of the items in the array represents the block type, so the first item would point to the H1 block.
-    tendencies: [@typeInfo(Block).Enum.fields.len] f16 = [_]f16{0} ** @typeInfo(Block).Enum.fields.len,
+    output: Tokens = .UNKOWN,
 
     // 0 1 2
     // 7   3
@@ -45,9 +67,14 @@ const Cell = struct {
 
 const markdownString = @embedFile("./markdown.md");
 
+// @TODO: No longer need a limited cell matrix like this one.
 var cellMatrix: [100][100]?Cell = undefined;
 
 fn getCellPtr(pos: Point) *?Cell {
+    if (pos.x < 0 or pos.y < 0) {
+        var r: ?Cell = null;
+        return &r;
+    }
     return &cellMatrix[@intCast(usize, pos.x)][@intCast(usize, pos.y)];
 }
 
@@ -69,7 +96,7 @@ pub fn main() !void {
             cellMatrix[@intCast(usize, x)][@intCast(usize, y)] = Cell{
                 .x = x,
                 .y = y,
-                .value = character,
+                .input = character,
                 .neighbors = [8]Point{
                     Point{ .x = x-1, .y = y-1 },
                     Point{ .x = x,   .y = y-1 },
@@ -89,72 +116,59 @@ pub fn main() !void {
     }
 
     print("Cell Size: {d} bytes\n", .{@sizeOf(Cell)});
-    print("Potential Size: {} KB\n\n", .{(10000 * @sizeOf(Cell)) / 1024});
 
-    // This for loop is a single step
+    // This loop is a single step
+    // For each powered cell, we run their activation code to pass on to the next layer on top.
     for (cellPtrList.items) |cellPtr| {
         if (cellPtr.* != null) {
-            const topleft = getCellPtr(cellPtr.*.?.neighbors[0]);
-            const top = getCellPtr(cellPtr.*.?.neighbors[1]);
-            const topright = getCellPtr(cellPtr.*.?.neighbors[2]);
+            // const topleft = getCellPtr(cellPtr.*.?.neighbors[0]);
+            // const top = getCellPtr(cellPtr.*.?.neighbors[1]);
+            // const topright = getCellPtr(cellPtr.*.?.neighbors[2]);
             const right = getCellPtr(cellPtr.*.?.neighbors[3]);
-            const bottomright = getCellPtr(cellPtr.*.?.neighbors[4]);
-            const bottom = getCellPtr(cellPtr.*.?.neighbors[5]);
-            const bottomleft = getCellPtr(cellPtr.*.?.neighbors[6]);
+            // const bottomright = getCellPtr(cellPtr.*.?.neighbors[4]);
+            // const bottom = getCellPtr(cellPtr.*.?.neighbors[5]);
+            // const bottomleft = getCellPtr(cellPtr.*.?.neighbors[6]);
             const left = getCellPtr(cellPtr.*.?.neighbors[7]);
 
-            // Rules for being a '#':
-            // 1. If I'm a '#' and I'm at the beginning, I could be a heading start.
-            // 2. If my right neighbor is a space, I am a heading 1 start.
-            // 3. If my right neighbor is a '#', I could be any heading start except 
-            //    a heading 1 start.
-            // 4. If my neighbors think they are part of a heading, then it reasurres
-            //    me that I'm a heading as well.
+            // '#', '-', '~', '[', ']', '>', '`', '(', ')', ' ', '!', '*', '_', '0..9', '.'
 
-            // What are all the necessary conditions for a character of a certain type to be a part of a heading 1?
+            // HEADING_START
+            if (
+                cellPtr.*.?.input == '#' and
+                (left.* == null or left.*.?.input == '#') and
+                (right.*.?.input == '#' or right.*.?.input == ' ')
+            ) {
+                print("HEADING_START\n", .{});
+                cellPtr.*.?.output = .HEADING_START;
+            }
 
-            // MUSTS for HEADING START:
-            // 1. Be a '#'
-            // 2. Left neighbor is '#', null or (user mistake) space
-            // 3. Right neighbor is '#' or space or (user mistake) alphanumeric
+            // MONO_TICK
+            // In theory, backticks are never used for content and only to show code.
+            // This means that we don't need to ask neighbors to know what it's used for.
+            // Unless it's used in a quote like '`' or ``` inside a paragraph.
+            // So actually it does have a few cases there.
+            // Maybe though, it's in an upper layer that we can know if it's part of content or not.
+            if (
+                cellPtr.*.?.input == '`'
+            ) {
+                // print("MONO_TICK\n", .{});
+                cellPtr.*.?.output = .MONO_TICK;
+            }
 
-            // REINFORCEMENTS for HEADING START:
-            // 1. Horizontal neighbors think they're part of a heading or heading start
+            // UNDERLINE_START
+            if (
+                cellPtr.*.?.input == '_'
+            ) {
+                // print("UNDERLINE_START\n", .{});
+                cellPtr.*.?.output = .UNDERLINE_START;
+            }
 
-            // REINFORCEMENTS for HEADING:
-            // 1. Empty lines above or below the heading line
-            // 2. Usually short line
-
-            // It seems that I might be needing multiple layers and that memory will be used more often than not.
-
-            // NOTES:
-
-            // * How much does it increase in activation with each rule?
-            // * Could it be that the amount of rules and their conclusions define 
-            //   the amount of activation it will have?
-            // * How do rules cancel each other out?
-            // * Can there be an algorithm that defines the amount of activation a set of 
-            //   rules would result in?
-
-            // Priority Character Types
-            // '#', '-', '~', '[..]', '>', '`', '(..)', ' ', '!', '*', '_', '0..9', '.'
-
-            if (cellPtr.*.?.value == '#') {
-                cellPtr.*.?.tendencies[0] = 0.25; // Why 25%? is there a way to calculate this value? Maybe based on the posibilities of each character?
-                cellPtr.*.?.tendencies[1] = 0.25;
-                cellPtr.*.?.tendencies[2] = 0.25;
-                cellPtr.*.?.tendencies[3] = 0.25;
-                cellPtr.*.?.tendencies[4] = 0.25;
-                cellPtr.*.?.tendencies[5] = 0.25;
-
-                if (right.* != null and right.*.?.value == ' ') {
-                    cellPtr.*.?.tendencies[0] = 0.9;
-                    cellPtr.*.?.tendencies[1] = 0;
-                    cellPtr.*.?.tendencies[2] = 0;
-                    cellPtr.*.?.tendencies[3] = 0;
-                    cellPtr.*.?.tendencies[4] = 0;
-                    cellPtr.*.?.tendencies[5] = 0;
-                }
+            // UNDERLINE_END
+            if (
+                cellPtr.*.?.input == '_'
+            ) {
+                // print("UNDERLINE_END\n", .{});
+                cellPtr.*.?.output = .UNDERLINE_END;
             }
         }
     }
@@ -163,6 +177,7 @@ pub fn main() !void {
     
     // Extra points: Create a websocket endpoint that serves this JSON: 
     // developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
+
 
     //
     // Loop to query each cell in terminal
@@ -188,10 +203,10 @@ pub fn main() !void {
         const cell: *?Cell = &cellMatrix[sx][sy];
 
         if (cell.* != null) {
-            print("Value for ({d}, {d}): '{u}'\n", .{ sx, sy, cell.*.?.value });
-            for (cell.*.?.tendencies) |tendency, index| {
-                print("Tendency[{}]: {d:.3}\n", .{ index, tendency});
-            }
+            print("Input for ({d}, {d}): '{u}'\n", .{ sx, sy, cell.*.?.input });
+            // for (cell.*.?.tendencies) |tendency, index| {
+            //     print("Tendency[{}]: {d:.3}\n", .{ index, tendency});
+            // }
 
         } else {
             print("Null cell at ({d}, {d})\n", .{ sx, sy });
