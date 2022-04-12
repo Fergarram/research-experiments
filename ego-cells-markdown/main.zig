@@ -1,5 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
+const ascii = std.ascii;
 
 const Block = enum {
     H1, H2, H3, H4, H5, H6,
@@ -138,37 +139,23 @@ pub fn main() !void {
                 (left.* == null or left.*.?.input == '#') and
                 (right.*.?.input == '#' or right.*.?.input == ' ')
             ) {
-                print("HEADING_START\n", .{});
+                // print("HEADING_START\n", .{});
                 cellPtr.*.?.output = .HEADING_START;
             }
 
-            // MONO_TICK
-            // In theory, backticks are never used for content and only to show code.
-            // This means that we don't need to ask neighbors to know what it's used for.
-            // Unless it's used in a quote like '`' or ``` inside a paragraph.
-            // So actually it does have a few cases there.
-            // Maybe though, it's in an upper layer that we can know if it's part of content or not.
+            // SNIPPET_START
             if (
-                cellPtr.*.?.input == '`'
+                cellPtr.*.?.input == '`' and
+                (left.* == null or left.*.?.input == '`') and
+                (
+                    right.* == null or
+                    right.*.?.input == '`' or
+                    right.*.?.input == ' ' or
+                    ascii.isAlNum(right.*.?.input)
+                )
             ) {
-                // print("MONO_TICK\n", .{});
-                cellPtr.*.?.output = .MONO_TICK;
-            }
-
-            // UNDERLINE_START
-            if (
-                cellPtr.*.?.input == '_'
-            ) {
-                // print("UNDERLINE_START\n", .{});
-                cellPtr.*.?.output = .UNDERLINE_START;
-            }
-
-            // UNDERLINE_END
-            if (
-                cellPtr.*.?.input == '_'
-            ) {
-                // print("UNDERLINE_END\n", .{});
-                cellPtr.*.?.output = .UNDERLINE_END;
+                // print("SNIPPET_START\n", .{});
+                cellPtr.*.?.output = .SNIPPET_START;
             }
         }
     }
@@ -203,10 +190,7 @@ pub fn main() !void {
         const cell: *?Cell = &cellMatrix[sx][sy];
 
         if (cell.* != null) {
-            print("Input for ({d}, {d}): '{u}'\n", .{ sx, sy, cell.*.?.input });
-            // for (cell.*.?.tendencies) |tendency, index| {
-            //     print("Tendency[{}]: {d:.3}\n", .{ index, tendency});
-            // }
+            print("I/O for ({d}, {d}): '{u}' -> {s}\n", .{ sx, sy, cell.*.?.input, @tagName(cell.*.?.output) });
 
         } else {
             print("Null cell at ({d}, {d})\n", .{ sx, sy });
