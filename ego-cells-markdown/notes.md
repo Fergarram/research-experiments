@@ -1,5 +1,53 @@
 
+Requirements for parallel processing:
+- Send a batch/texture with CharFeature values (0 - 16)
+- Send a batch/texture with FeatureToken values
+- Send a batch/texture with LineToken values
+- Send a batch/texture with Block values
+- Execute neighboring rules in shader program
+- Dynamic reload of shader program
+
+Return all the layers encoded into a single texture. It could be a larger one, like a string or type of atlas. Then, for rendering we could take that single texture and divide it into as many things as we need.
+
+The advantage would be that we would have all the neighboring logic into a single shader program.
+
+This might not be scalable though. Or not easily doable. I guess we'll find out what's better or possible.
+
+--------------------------------------------------------------------------------
+
+How do I condense multiple cells into a single one?
+
+--------------------------------------------------------------------------------
+
+I'm having a realization again. My approach has been the wrong approach. I need to take more layers and have space into close consideration. Consider the following example:
+
+```
+# We could have a title like this
+
+#We could have a title like this
+
+ #We could have a title like this
+
+ #  We could have a title like this
+```
+
+The second sample line above is the trickiest one for sure, but the others would in theory make it possible to parse correctly without the need of a prediction system.
+
+I have been trying to use neighboring rules on raw data when the correct approach would be to take all characters including nulls or spaces into their corresponding tokens.
+
+An approach based on words is closer to reality.
+
+--------------------------------------------------------------------------------
+
+A problem I'm encountering is that I myself don't have strict exact rules for Markdown syntax. I'm kinda making the rules on the go, I'm improvising. So that might say that there are no strict rules at all, never(?). 
+
+What if instead of being sure about something being something it's rather a "could be"? For example, instead of saying "I'm for sure a HEAD_SINGLE" say, "I could be a HEAD_SINGLE" and let the final decision be made by the top layer in the hierarchy.
+
+--------------------------------------------------------------------------------
+
 There are always going to be multiple ways to solve categorization problems like this one. I think I'm getting overwhelmed by the ones I can think of.
+
+There's always going to be new ways of determining if something is correct.
 
 Each cell can ask questions to other cells.
 This questions are (usually?) referential, meaning that the answer is a reference that can be answer by eventually getting a piece of data which is evidence that a cell may have.

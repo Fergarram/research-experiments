@@ -4,21 +4,25 @@ This is one of those projects which are born after a burst of excitement but you
 finishing it, to the #uncomfortable point were it isn’t good enough to publish but it is 
 good enough to talk about it.
 
-Some inlined `code` here and a test here: '`'.
+Do we support emojis? 🧠
+
+Some inlined `code` here and a test here: '`' wtf `\``. // Backslashing is manually processed
 
 So, in this series I will share with you how I retake this project and finish it to the MVP 
-point in ~two weekends~!
+point in ~~two weekends~~!
 
 Adding some code here:
 
 ```bash
+
 # This is some sample bash code
-echo "Let's try some _markdown_ ~crazy~ [shit](shit.com)"
+echo "Let's try some _markdown_ ~~crazy~~ [shit](shit.com)"
+
 ```
 
 some more
 ```
-bla bla "```" The middle tick thinks that it's part of a SNIPPET_START/END
+bla bla "```" The middle tick thinks that it's a SNIP_MIDDLE
 which probably means that this will fail as well: ### haha
 ```
 
