@@ -37,9 +37,9 @@ Anyways, I bought the thing and went on to enable development mode and got a Hel
 app running.
 
 A few months past by and suddenly decided I wanted to do something with it. I though of 
-remaking [a game I made](https://fergarram.itch.io/amateur-archaeology-iii) for a game jam 
-some years ago using Game Maker. This was the perfect idea, the game was simple enough so 
-I started on working on it.
+remaking [How would we handle things like this where they wrap?](https://fergarram.itch.io/
+amateur-archaeology-iii) for a game jam some years ago using Game Maker. This was the perfect 
+idea, the game was simple enough so I started on working on it.
 
 ## Defining the MVP
 As a starting point it should have the same functionalities as the original game with some 

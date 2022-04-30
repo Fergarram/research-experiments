@@ -11,7 +11,7 @@ pub fn main() anyerror!void {
     const screenHeight = 450;
 
     rl.InitWindow(screenWidth, screenHeight, "Ego Cells: Experiment 001");
-    const shaderProgram = rl.LoadShaderFromMemory(0, fragmentScript);
+    // const shaderProgram = rl.LoadShaderFromMemory(0, fragmentScript);
 
     rl.SetTargetFPS(60);
     while (!rl.WindowShouldClose()) {
@@ -19,10 +19,10 @@ pub fn main() anyerror!void {
 
         rl.ClearBackground(rl.WHITE);
 
-        rl.BeginShaderMode(shaderProgram);
+        // rl.BeginShaderMode(shaderProgram);
         rl.DrawCircle(80, 120, 35, rl.DARKBLUE);
         rl.DrawText("Congrats! You created your first window!", 190, 200, 20, rl.LIGHTGRAY);
-        rl.EndShaderMode();
+        // rl.EndShaderMode();
 
         rl.EndDrawing();
     }

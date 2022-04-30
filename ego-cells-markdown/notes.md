@@ -1,18 +1,4 @@
 
-Requirements for parallel processing:
-- Send a batch/texture with CharFeature values (0 - 16)
-- Send a batch/texture with FeatureToken values
-- Send a batch/texture with LineToken values
-- Send a batch/texture with Block values
-- Execute neighboring rules in shader program
-- Dynamic reload of shader program
-
-Return all the layers encoded into a single texture. It could be a larger one, like a string or type of atlas. Then, for rendering we could take that single texture and divide it into as many things as we need.
-
-The advantage would be that we would have all the neighboring logic into a single shader program.
-
-This might not be scalable though. Or not easily doable. I guess we'll find out what's better or possible.
-
 --------------------------------------------------------------------------------
 
 How do I condense multiple cells into a single one?

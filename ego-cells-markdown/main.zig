@@ -1,4 +1,6 @@
 const std = @import("std");
+const ocl = @import("ocl.zig");
+
 const print = std.debug.print;
 const ascii = std.ascii;
 
@@ -55,7 +57,7 @@ const TokenFeature = enum {
     EMPTY
 };
 
-const CharFeature = enum {
+const CharFeature = enum(u8) {
     @" ",
     @"abc",
     @"123",
@@ -101,25 +103,26 @@ const Cell = struct {
 };
 
 const markdownString = @embedFile("./markdown.md");
+const cellProgramSource = @embedFile("./program.cl");
 
-var cellMatrix: [100][100]?Cell = undefined;
+var cellMatrix: [128][128]?Cell = undefined;
 
 fn getCellPtr(pos: Point) *?Cell {
     var noone: ?Cell = null;
     if (pos.x < 0 or pos.y < 0) {
         return &noone;
-    } else if (pos.x >= 100 or pos.y >= 100) {
+    } else if (pos.x >= 128 or pos.y >= 128) {
         return &noone;
     }
     return &cellMatrix[@intCast(usize, pos.x)][@intCast(usize, pos.y)];
 }
 
-pub fn main() !void {
-    for (cellMatrix) |col, x| {
+fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
+    for (matrix.*) |col, x| {
         for (col) |_, y| {
             const xx = @intCast(i32, x);
             const yy = @intCast(i32, y);
-            cellMatrix[x][y] = Cell{
+            matrix.*[x][y] = Cell{
                 .x = xx,
                 .y = yy,
                 .input = ' ',
@@ -144,7 +147,7 @@ pub fn main() !void {
         var y: i32 = 0;
         var x: i32 = 0;
 
-        for (markdownString) |character| {
+        for (markdown) |character| {
             if (character == '\n') {
                 y += 1;
                 x = 0;
@@ -173,180 +176,203 @@ pub fn main() !void {
             else if (character == '\\') outL1 = .@"\\"
             else outL1 = .@"sym";
 
-            cellMatrix[@intCast(usize, x)][@intCast(usize, y)].?.input = character;
-            cellMatrix[@intCast(usize, x)][@intCast(usize, y)].?.outputL1 = outL1;
-            cellMatrix[@intCast(usize, x)][@intCast(usize, y)].?.outputL2 = .CONTENT;
-            cellMatrix[@intCast(usize, x)][@intCast(usize, y)].?.neighbors = [8]Point{
-                Point{ .x = x-1, .y = y-1 },
-                Point{ .x = x,   .y = y-1 },
-                Point{ .x = x+1, .y = y-1 },
-                Point{ .x = x+1, .y = y },
-                Point{ .x = x+1, .y = y+1 },
-                Point{ .x = x,   .y = y+1 },
-                Point{ .x = x-1, .y = y+1 },
-                Point{ .x = x-1, .y = y }
-            };
+            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.input = character;
+            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL1 = outL1;
+            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL2 = .CONTENT;
 
             x += 1;
         }
     }
+}
+
+pub fn main() !void {
+    initializeCellMatrix(&cellMatrix, markdownString[0..markdownString.len]);
+
+    var layer1CellBuffer: [128*128]u8 = undefined;
+    var l1Count: usize = 0;
 
     for (cellMatrix) |col, x| {
         for (col) |_, y| {
-            const cellPtr = &cellMatrix[x][y];
+            const cellPtr = &cellMatrix[y][x];
             if (cellPtr.* != null) {
-                // const topleft = getCellPtr(cellPtr.*.?.neighbors[0]);
-                const top = getCellPtr(cellPtr.*.?.neighbors[1]);
-                // const topright = getCellPtr(cellPtr.*.?.neighbors[2]);
-                const right = getCellPtr(cellPtr.*.?.neighbors[3]);
-                // const bottomright = getCellPtr(cellPtr.*.?.neighbors[4]);
-                const bottom = getCellPtr(cellPtr.*.?.neighbors[5]);
-                // const bottomleft = getCellPtr(cellPtr.*.?.neighbors[6]);
-                const left = getCellPtr(cellPtr.*.?.neighbors[7]);
-
-                if (cellPtr.*.?.outputL1 == .@"#") {
-                    // HEAD_SINGLE
-                    if (
-                        left.* == null and
-                        (right.* != null and right.*.?.outputL1 == .@" ")
-                    ) {
-                        cellPtr.*.?.outputL2 = .HEAD_SINGLE;
-                    }
-
-                    // HEAD_FIRST
-                    if (
-                        left.* == null and
-                        (right.* != null and right.*.?.outputL1 == .@"#")
-                    ) {
-                        cellPtr.*.?.outputL2 = .HEAD_FIRST;
-                    }
-
-                    // HEAD_MIDDLE
-                    if (
-                        (left.* != null and left.*.?.outputL1 == .@"#") and
-                        (left.* != null and left.*.?.outputL2 == .HEAD_FIRST) and
-                        (right.* != null and right.*.?.outputL1 == .@"#") and
-                        (right.* != null and right.*.?.outputL2 == .HEAD_LAST)
-                    ) {
-                        cellPtr.*.?.outputL2 = .HEAD_MIDDLE;
-                    }
-
-                    // HEAD_LAST
-                    if (
-                        (left.* != null and left.*.?.outputL1 == .@"#") and
-                        (right.* != null and right.*.?.outputL1 == .@" ")
-                    ) {
-                        cellPtr.*.?.outputL2 = .HEAD_LAST;
-                    }
-                }
-
-                if (cellPtr.*.?.outputL1 == .@"`") {
-                    // SNIP_FIRST
-                    if (
-                        left.* == null and
-                        (right.* != null and right.*.?.outputL1 == .@"`")
-                    ) {
-                        cellPtr.*.?.outputL2 = .SNIP_FIRST;
-                    }
-
-                    // SNIP_MIDDLE
-                    if (
-                        (left.* != null and left.*.?.outputL1 == .@"`") and
-                        (left.* != null and left.*.?.outputL2 == .SNIP_FIRST) and
-                        (right.* != null and right.*.?.outputL1 == .@"`") and
-                        (right.* != null and right.*.?.outputL2 == .SNIP_LAST)
-                    ) {
-                        cellPtr.*.?.outputL2 = .SNIP_MIDDLE;
-                    }
-
-                    // SNIP_LAST
-                    if (
-                        (left.* != null and left.*.?.outputL1 == .@"`") and
-                        (right.* == null or right.*.?.outputL1 == .@"abc")
-                    ) {
-                        cellPtr.*.?.outputL2 = .SNIP_LAST;
-                    }
-                }
-
-                if (
-                    cellPtr.*.?.outputL2 == .EMPTY and
-                    (bottom.* != null and bottom.*.?.outputL2 == .SNIP_CONTENT) and
-                    (
-                        left.* != null and
-                        (left.*.?.outputL2 == .SNIP_LAST or left.*.?.outputL2 == .SNIP_LANG)
-                    )
-                ) {
-                    cellPtr.*.?.outputL3 = .SNIP_START;
-                }
-
-                if (
-                    cellPtr.*.?.outputL2 == .EMPTY and
-                    (top.* != null and top.*.?.outputL2 == .SNIP_CONTENT) and
-                    (left.* != null and left.*.?.outputL2 == .SNIP_LAST)
-                ) {
-                    cellPtr.*.?.outputL3 = .SNIP_END;
-                }
-
-                if (
-                    top.* != null and
-                    (
-                        top.*.?.outputL2 == .SNIP_FIRST or
-                        top.*.?.outputL2 == .SNIP_MIDDLE or
-                        top.*.?.outputL2 == .SNIP_LAST or
-                        top.*.?.outputL2 == .SNIP_LANG
-                    )
-                ) {
-                    // THIS ALWAYS OVERRIDES
-                    cellPtr.*.?.outputL2 = .SNIP_CONTENT;
-                }
-
-                if (cellPtr.*.?.outputL2 == .EMPTY and
-                    bottom.* != null and
-                    (
-                        bottom.*.?.outputL2 == .SNIP_FIRST or
-                        bottom.*.?.outputL2 == .SNIP_MIDDLE or
-                        bottom.*.?.outputL2 == .SNIP_LAST
-                    ) and
-                    top.* != null and
-                    (
-                        top.*.?.outputL2 == .SNIP_CONTENT
-                    )
-                ) {
-                    // THIS ALWAYS OVERRIDES EMPTY SPACES
-                    cellPtr.*.?.outputL2 = .SNIP_CONTENT;
-                }
-
-                if (
-                    cellPtr.*.?.outputL3 != .SNIP_START and
-                    cellPtr.*.?.outputL3 != .SNIP_END and 
-                    (
-                        (top.* != null and top.*.?.outputL2 == .SNIP_CONTENT) or
-                        (left.* != null and left.*.?.outputL2 == .SNIP_CONTENT) or
-                        (right.* != null and right.*.?.outputL2 == .SNIP_CONTENT) or
-                        (bottom.* != null and bottom.*.?.outputL2 == .SNIP_CONTENT)
-                    )
-                ) {
-                    cellPtr.*.?.outputL2 = .SNIP_CONTENT;
-                }
+                layer1CellBuffer[l1Count] = @enumToInt(cellPtr.*.?.outputL1);
             }
+            l1Count += 1;
         }
     }
 
-    print("Cell Size: {d} bytes\n", .{@sizeOf(Cell)});
+    try ocl.listHardware();
+
     const stdin = std.io.getStdIn().reader();
+    var userReadBuff: [10]u8 = undefined;
+    var platformNo: usize = undefined;
+    var deviceNo: usize = undefined;
+
+    print("\nSelect a CL platform: ", .{});
+    if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
+        platformNo = try std.fmt.parseInt(usize, user_input, 10);
+    }
+
+    print("Select a CL device: ", .{});
+    if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
+        deviceNo = try std.fmt.parseInt(usize, user_input, 10);
+    }
+
+    print("\n", .{});
+
+    var device = try ocl.getDeviceId(platformNo, deviceNo);
+    print("Selected device ID: {}\n\n", .{device});
+
+    var ctx = try ocl.createContext(&device);
+    defer ocl.releaseContext(ctx);
+
+    var commandQueue = try ocl.createCommandQueue(ctx, device);
+    defer ocl.releaseCommandQueue(commandQueue);
+
+    var program = try ocl.createProgramWithSource(ctx, cellProgramSource);
+    defer ocl.releaseProgram(program);
+
+    try ocl.buildProgramForDevice(program, &device);
+
+    var kernel = try ocl.createKernel(program, "L1Rules");
+    defer ocl.releaseKernel(kernel);
+
+    // var test_array = init: {
+    //     var init_value: [1024]i32 = undefined;
+    //     for (init_value) |*pt, i| {
+    //         pt.* = @intCast(i32, i);
+    //     }
+    //     break :init init_value;
+    // };
+
+    var imageFormat = ocl.CLImageFormat{
+        .order = @enumToInt(ocl.CLChannelOrder.R),
+        .type = @enumToInt(ocl.CLChannelType.UNSIGNED_INT8)
+    };
+
+    var inputImage = try ocl.createImage(
+        ctx,
+        .READ_ONLY,
+        imageFormat,
+        128,
+        128
+    );
+    defer ocl.releaseMemObj(inputImage);
+
+    var outputImage = try ocl.createImage(
+        ctx,
+        .WRITE_ONLY,
+        imageFormat,
+        128,
+        128
+    );
+    defer ocl.releaseMemObj(outputImage);
+
+    // var inputBuffer = try ocl.createBuffer(
+    //     ctx,
+    //     .READ_ONLY,
+    //     test_array.len * @sizeOf(i32)
+    // );
+    // defer ocl.releaseMemObj(inputBuffer);
+
+    // var outputBuffer = try ocl.createBuffer(
+    //     ctx,
+    //     .WRITE_ONLY,
+    //     test_array.len * @sizeOf(i32)
+    // );
+    // defer ocl.releaseMemObj(outputBuffer);
+
+    try ocl.enqueueWriteImageWithData(
+        commandQueue,
+        inputImage,
+        true,
+        [3]usize{0,0,0},
+        [3]usize{128,128,1},
+        128 * @sizeOf(u8),
+        0,
+        u8,
+        &layer1CellBuffer
+    );
+
+    // Because this call is "blocking" it means that it will make sure that this "command"
+    // will runs ASAP and will wait until it's written.
+    // Altarnatively I could use events to make this not blocking.
+    // try ocl.enqueueWriteBufferWithData(
+    //     commandQueue,
+    //     inputBuffer,
+    //     true,
+    //     0,
+    //     i32,
+    //     &test_array,
+    //     test_array.len
+    // );
+
+    try ocl.setKernelArg(kernel, 0, &inputImage);
+    try ocl.setKernelArg(kernel, 1, &outputImage);
+
+    // var globalWorkSize: usize = test_array.len;
+    // var localWorkSize: usize = 64; // Not sure why 64
+
+    // So this will NOT start the command immediately
+    try ocl.enqueueNDRangeKernelWithoutEvents(
+        commandQueue,
+        kernel,
+        2,
+        [3]usize{128,128,0},
+        null
+    );
+
+    try ocl.enqueueReadImageWithData(
+        commandQueue,
+        outputImage,
+        true,
+        [3]usize{0,0,0},
+        [3]usize{128,128,1},
+        128 * @sizeOf(u8),
+        0,
+        u8,
+        &layer1CellBuffer
+    );
+
+    for (layer1CellBuffer) |item| {
+        print("{d}", .{item});
+    }
+
+    print("\n", .{});
+
+    // var outputTestArray: [1024]i32 = undefined;
+
+    // This call is blocking until it finishes executing the "command".
+    // And if the previous command has not been executed yet, this 
+    // forces it to execute and finish. Which in this case the last
+    // command was to run the kernel.
+    // try ocl.enqueueReadBufferToDataPtr(
+    //     commandQueue,
+    //     outputBuffer,
+    //     true,
+    //     0,
+    //     i32,
+    //     &outputTestArray,
+    //     outputTestArray.len
+    // );
+
+    // for (outputTestArray) |val, i| {
+    //     print("{} ^ 2 = {}\n", .{i, val});
+    // }
+
+    print("Cell Size: {d} bytes\n", .{@sizeOf(Cell)});
 
     while (true) {
         var sx: usize = 0;
         var sy: usize = 0;
-        var readBuffer: [10]u8 = undefined;
 
         print("X: ", .{});
-        if (try stdin.readUntilDelimiterOrEof(readBuffer[0..], '\n')) |user_input| {
+        if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
             sx = try std.fmt.parseInt(usize, user_input, 10);
         }
 
         print("Y: ", .{});
-        if (try stdin.readUntilDelimiterOrEof(readBuffer[0..], '\n')) |user_input| {
+        if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
             sy = try std.fmt.parseInt(usize, user_input, 10);
         }
 
