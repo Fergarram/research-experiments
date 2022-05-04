@@ -1,5 +1,6 @@
 const std = @import("std");
 const ocl = @import("ocl.zig");
+const rl = @import("raylib");
 
 const print = std.debug.print;
 const ascii = std.ascii;
@@ -188,7 +189,7 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
 pub fn main() !void {
     initializeCellMatrix(&cellMatrix, markdownString[0..markdownString.len]);
 
-    var layer1CellBuffer: [128*128]u8 = undefined;
+    var layer1CellBuffer = [_]u8{0} ** (128*128*5);
     var l1Count: usize = 0;
 
     for (cellMatrix) |col, x| {
@@ -203,22 +204,22 @@ pub fn main() !void {
 
     try ocl.listHardware();
 
-    const stdin = std.io.getStdIn().reader();
-    var userReadBuff: [10]u8 = undefined;
-    var platformNo: usize = undefined;
-    var deviceNo: usize = undefined;
+    // const stdin = std.io.getStdIn().reader();
+    // var userReadBuff: [10]u8 = undefined;
+    var platformNo: usize = 0;
+    var deviceNo: usize = 0;
 
-    print("\nSelect a CL platform: ", .{});
-    if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
-        platformNo = try std.fmt.parseInt(usize, user_input, 10);
-    }
+    // print("\nSelect a CL platform: ", .{});
+    // if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
+    //     platformNo = try std.fmt.parseInt(usize, user_input, 10);
+    // }
 
-    print("Select a CL device: ", .{});
-    if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
-        deviceNo = try std.fmt.parseInt(usize, user_input, 10);
-    }
+    // print("Select a CL device: ", .{});
+    // if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
+    //     deviceNo = try std.fmt.parseInt(usize, user_input, 10);
+    // }
 
-    print("\n", .{});
+    // print("\n", .{});
 
     var device = try ocl.getDeviceId(platformNo, deviceNo);
     print("Selected device ID: {}\n\n", .{device});
@@ -234,16 +235,8 @@ pub fn main() !void {
 
     try ocl.buildProgramForDevice(program, &device);
 
-    var kernel = try ocl.createKernel(program, "L1Rules");
+    var kernel = try ocl.createKernel(program, "markdown");
     defer ocl.releaseKernel(kernel);
-
-    // var test_array = init: {
-    //     var init_value: [1024]i32 = undefined;
-    //     for (init_value) |*pt, i| {
-    //         pt.* = @intCast(i32, i);
-    //     }
-    //     break :init init_value;
-    // };
 
     var imageFormat = ocl.CLImageFormat{
         .order = @enumToInt(ocl.CLChannelOrder.R),
@@ -252,10 +245,11 @@ pub fn main() !void {
 
     var inputImage = try ocl.createImage(
         ctx,
-        .READ_ONLY,
+        .READ_WRITE,
         imageFormat,
         128,
-        128
+        128,
+        5
     );
     defer ocl.releaseMemObj(inputImage);
 
@@ -264,127 +258,156 @@ pub fn main() !void {
         .WRITE_ONLY,
         imageFormat,
         128,
-        128
+        128,
+        5
     );
     defer ocl.releaseMemObj(outputImage);
 
-    // var inputBuffer = try ocl.createBuffer(
-    //     ctx,
-    //     .READ_ONLY,
-    //     test_array.len * @sizeOf(i32)
-    // );
-    // defer ocl.releaseMemObj(inputBuffer);
-
-    // var outputBuffer = try ocl.createBuffer(
-    //     ctx,
-    //     .WRITE_ONLY,
-    //     test_array.len * @sizeOf(i32)
-    // );
-    // defer ocl.releaseMemObj(outputBuffer);
-
+    // Because this call is "blocking" it means that it will make sure that this "command"
+    // will runs ASAP and will wait until it's written.
+    // Altarnatively I could use events to make this not blocking.
     try ocl.enqueueWriteImageWithData(
         commandQueue,
         inputImage,
         true,
         [3]usize{0,0,0},
-        [3]usize{128,128,1},
+        [3]usize{128,128,5},
         128 * @sizeOf(u8),
         0,
         u8,
         &layer1CellBuffer
     );
 
-    // Because this call is "blocking" it means that it will make sure that this "command"
-    // will runs ASAP and will wait until it's written.
-    // Altarnatively I could use events to make this not blocking.
-    // try ocl.enqueueWriteBufferWithData(
-    //     commandQueue,
-    //     inputBuffer,
-    //     true,
-    //     0,
-    //     i32,
-    //     &test_array,
-    //     test_array.len
-    // );
-
     try ocl.setKernelArg(kernel, 0, &inputImage);
     try ocl.setKernelArg(kernel, 1, &outputImage);
-
-    // var globalWorkSize: usize = test_array.len;
-    // var localWorkSize: usize = 64; // Not sure why 64
 
     // So this will NOT start the command immediately
     try ocl.enqueueNDRangeKernelWithoutEvents(
         commandQueue,
         kernel,
-        2,
-        [3]usize{128,128,0},
+        3,
+        [3]usize{128,128,5},
         null
     );
 
+    // This call is blocking until it finishes executing the "command".
+    // And if the previous command has not been executed yet, this 
+    // forces it to execute and finish. Which in this case the last
+    // command was to run the kernel.
     try ocl.enqueueReadImageWithData(
         commandQueue,
         outputImage,
         true,
         [3]usize{0,0,0},
-        [3]usize{128,128,1},
+        [3]usize{128,128,5},
         128 * @sizeOf(u8),
         0,
         u8,
         &layer1CellBuffer
     );
 
-    for (layer1CellBuffer) |item| {
-        print("{d}", .{item});
+    const GRID_SIZE = 6;
+    const UIWidth = 300;
+
+    const screenWidth = (128 * GRID_SIZE) + UIWidth;
+    const screenHeight = 128 * GRID_SIZE;
+
+    const UIXStart = screenWidth - UIWidth;
+
+    rl.InitWindow(screenWidth, screenHeight, "Ego Cells: Experiment 001");
+
+    rl.SetTargetFPS(60);
+
+    var colCount: c_int = 0;
+    var rowCount: c_int = 0;
+
+    var mouseX: c_int = 0;
+    var mouseY: c_int = 0;
+
+    while (!rl.WindowShouldClose()) {
+
+        mouseX = @divFloor(rl.GetMouseX(), GRID_SIZE);
+        mouseY = @divFloor(rl.GetMouseY(), GRID_SIZE);
+
+        if (mouseX <= 0) mouseX = 0;
+        if (mouseY <= 0) mouseY = 0;
+        if (mouseX >= 127) mouseX = 127;
+        if (mouseY >= 127) mouseY = 127;
+
+        rl.BeginDrawing();
+
+        rl.ClearBackground(rl.GetColor(0x282828FF));
+
+        rl.DrawRectangle(UIXStart, 0, UIWidth, screenHeight, rl.LIGHTGRAY);
+        rl.DrawText(rl.TextFormat("X: %03i", mouseX), (UIXStart) + 8, 8, 10, rl.BLACK);
+        rl.DrawText(rl.TextFormat("Y: %03i", mouseY), (UIXStart) + 8, 24, 10, rl.BLACK);
+
+        var tooltipText: ?[*:0]const u8 = null;
+
+        for (layer1CellBuffer) |item| {
+            const cellColor = switch (@intToEnum(CharFeature, item)) {
+                .@"abc", .@"123", .@"sym" => rl.GetColor(0xC6C6C6FF),
+                // .@".", => rl.GetColor(),
+                .@">",
+                .@"#" => rl.GetColor(0xFF0000FF),
+                .@"~",
+                .@"*",
+                .@"-" => rl.GetColor(0x008000FF),
+                .@"(",
+                .@")",
+                .@"[",
+                .@"]" => rl.GetColor(0xFFFF00FF),
+                .@"`" => rl.GetColor(0x008080FF),
+                .@"\\" => rl.GetColor(0x0000FFFF),
+                else => rl.GetColor(0xFFFFFFFF)
+            };
+
+            if (item > 0) {
+                rl.DrawCircle(
+                    (GRID_SIZE/2) + (colCount * GRID_SIZE),
+                    (GRID_SIZE/2) + (rowCount * GRID_SIZE),
+                    GRID_SIZE/3,
+                    cellColor
+                );
+                if (mouseX == colCount and mouseY == rowCount) {
+                    tooltipText = @tagName(@intToEnum(CharFeature, item));
+                }
+            }
+
+            colCount += 1;
+
+            if (colCount == 128) {
+                colCount = 0;
+                rowCount += 1;
+            }
+
+            if (rowCount == 128) {
+                break;
+            }
+        }
+
+        colCount = 0;
+        rowCount = 0;
+
+        if (tooltipText != null) {
+            rl.DrawRectangle(
+                rl.GetMouseX() + 24,
+                rl.GetMouseY(),
+                24,
+                12,
+                rl.WHITE
+            );
+            rl.DrawText(
+                tooltipText.?,
+                rl.GetMouseX() + 28,
+                rl.GetMouseY(),
+                10,
+                rl.BLACK
+            );
+        }
+
+        rl.EndDrawing();
     }
 
-    print("\n", .{});
-
-    // var outputTestArray: [1024]i32 = undefined;
-
-    // This call is blocking until it finishes executing the "command".
-    // And if the previous command has not been executed yet, this 
-    // forces it to execute and finish. Which in this case the last
-    // command was to run the kernel.
-    // try ocl.enqueueReadBufferToDataPtr(
-    //     commandQueue,
-    //     outputBuffer,
-    //     true,
-    //     0,
-    //     i32,
-    //     &outputTestArray,
-    //     outputTestArray.len
-    // );
-
-    // for (outputTestArray) |val, i| {
-    //     print("{} ^ 2 = {}\n", .{i, val});
-    // }
-
-    print("Cell Size: {d} bytes\n", .{@sizeOf(Cell)});
-
-    while (true) {
-        var sx: usize = 0;
-        var sy: usize = 0;
-
-        print("X: ", .{});
-        if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
-            sx = try std.fmt.parseInt(usize, user_input, 10);
-        }
-
-        print("Y: ", .{});
-        if (try stdin.readUntilDelimiterOrEof(userReadBuff[0..], '\n')) |user_input| {
-            sy = try std.fmt.parseInt(usize, user_input, 10);
-        }
-
-        const cell: *?Cell = &cellMatrix[sx][sy];
-
-        if (cell.* != null) {
-            print("I/O for ({d}, {d}): '{u}' -> L1: '{s}', L2: {s}\n", .{ sx, sy, cell.*.?.input, @tagName(cell.*.?.outputL1), @tagName(cell.*.?.outputL2) });
-
-        } else {
-            print("Null cell at ({d}, {d})\n", .{ sx, sy });
-        }
-
-        print("\n\n", .{}); 
-    }
+    rl.CloseWindow();
 }

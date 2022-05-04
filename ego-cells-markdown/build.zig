@@ -1,11 +1,17 @@
 const builtin = @import("builtin");
 const std = @import("std");
 const Builder = std.build.Builder;
+const raylib = @import("raylib/lib.zig");
 
 pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
-    const exe = b.addExecutable("zig-opencl-test", "main.zig");
+    const target = b.standardTargetOptions(.{}); // Used for Raylib
+
+    const exe = b.addExecutable("ego-cells-markdown", "main.zig");
     exe.setBuildMode(mode);
+    exe.setTarget(target); // Used for Raylib
+
+    // OpenCL
     exe.addIncludeDir("./opencl");
     exe.linkSystemLibrary("c");
 
@@ -24,11 +30,21 @@ pub fn build(b: *Builder) void {
         }
     }
 
-    exe.install();
+    // Raylib
+    const systemLib = b.option(
+        bool,
+        "system-raylib",
+        "link to preinstalled raylib libraries"
+    ) orelse false;
+    raylib.link(exe, systemLib);
+    raylib.addAsPackage("raylib", exe);
+    raylib.math.addAsPackage("raylib-math", exe);
 
-    const run_cmd = exe.run();
-    run_cmd.step.dependOn(b.getInstallStep());
+    exe.install(); // Used for both
 
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    const runCmd = exe.run();
+    runCmd.step.dependOn(b.getInstallStep()); // Used for OpenCL
+
+    const runStep = b.step("run", "Run the app");
+    runStep.dependOn(&runCmd.step);
 }

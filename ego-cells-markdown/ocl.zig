@@ -277,8 +277,22 @@ pub fn releaseProgram(program: c.cl_program) void {
 }
 
 pub fn buildProgramForDevice(program: c.cl_program, devicePtr: *c.cl_device_id) CLError!void {
-    if (c.clBuildProgram(program, 1, devicePtr, null, null, null) != c.CL_SUCCESS) {
-        // @TODO: Use clGetProgramBuildInfo to get log
+    var errno = c.clBuildProgram(program, 1, devicePtr, null, null, null);
+    if (errno != c.CL_SUCCESS) {
+        print("errno: {}\n", .{errno});
+        var logBuffer = [_]u8{' '} ** 10000;
+        var bufferSize: usize = 1;
+        _ = c.clGetProgramBuildInfo(
+            program,
+            devicePtr.*,
+            c.CL_PROGRAM_BUILD_LOG,
+            10000 * @sizeOf(u8),
+            @ptrCast(*anyopaque, &logBuffer),
+            &bufferSize
+        );
+
+        print("{s}\n", .{logBuffer[0..bufferSize]});
+
         return CLError.BuildProgramFailed;
     }
 }
@@ -367,13 +381,14 @@ pub fn createImage(
     memFlag: CLMemFlag,
     format: CLImageFormat,
     width: usize,
-    height: usize
+    height: usize,
+    depth: usize,
 ) CLError!c.cl_mem {
     var imageDesc = CLImageDesc{
-        .type = c.CL_MEM_OBJECT_IMAGE2D,
+        .type = if (depth > 0) c.CL_MEM_OBJECT_IMAGE3D else c.CL_MEM_OBJECT_IMAGE2D,
         .width = width,
         .height = height,
-        .depth = 0,
+        .depth = depth,
         .arraySize = 0,
         .rowPitch = 0,
         .slicePitch = 0,
