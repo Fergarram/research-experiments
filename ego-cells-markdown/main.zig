@@ -5,22 +5,23 @@ const rl = @import("raylib");
 const print = std.debug.print;
 const ascii = std.ascii;
 
-const Block = enum {
+const Block = enum(u8) {
+    NONE,
     H1, H2, H3, H4, H5, H6,
     PARAGRAPH,
-    // UL_ITEM,
-    // OL_ITEM,
-    // MONO,
-    // UNDERLINE,
-    // BOLD,
-    // ITALIC,
-    // STRIKE,
-    // LINK,
+    UL_ITEM,
+    OL_ITEM,
+    MONO,
+    UNDERLINE,
+    BOLD,
+    ITALIC,
+    STRIKE,
+    LINK,
     CODE_SNIPPET,
-    // QUOTE
+    QUOTE
 };
 
-const LineFeature = enum {
+const LineFeature = enum(u8) {
     HEADING,
     SNIP_START,
     SNIP_END,
@@ -30,7 +31,8 @@ const LineFeature = enum {
 };
 
 
-const TokenFeature = enum {
+const TokenFeature = enum(u8) {
+    EMPTY,
     CONTENT,
     HEAD_SINGLE,
     HEAD_FIRST,
@@ -41,21 +43,20 @@ const TokenFeature = enum {
     SNIP_LAST,
     SNIP_LANG,
     SNIP_CONTENT,
-    // SNIP_SINGLE,
-    // UNDR_START,
-    // UNDR_END,
-    // BOLD_START,
-    // BOLD_END,
-    // ITAL_START,
-    // ITAL_END,
-    // STRK_START,
-    // STRK_END,
-    // LINK_CONTENT_START,
-    // LINK_CONTENT_END,
-    // LINK_URL_START,
-    // LINK_URL_END,
-    // QUOT_START,
-    EMPTY
+    SNIP_SINGLE,
+    UNDR_START,
+    UNDR_END,
+    BOLD_START,
+    BOLD_END,
+    ITAL_START,
+    ITAL_END,
+    STRK_START,
+    STRK_END,
+    LINK_CONTENT_START,
+    LINK_CONTENT_END,
+    LINK_URL_START,
+    LINK_URL_END,
+    QUOT_START
 };
 
 const CharFeature = enum(u8) {
@@ -95,12 +96,7 @@ const Cell = struct {
     outputL1: CharFeature = undefined,
     outputL2: TokenFeature = undefined,
     outputL3: LineFeature = undefined,
-    // outputL4: Block = undefined,
-
-    neighbors: [8]Point = undefined,
-    // 0 1 2
-    // 7   3
-    // 6 5 4
+    outputL4: Block = undefined,
 };
 
 const markdownString = @embedFile("./markdown.md");
@@ -130,16 +126,6 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
                 .outputL1 = .@" ",
                 .outputL2 = .EMPTY,
                 .outputL3 = .EMPTY_LINE,
-                .neighbors = [8]Point{
-                    Point{ .x = xx-1, .y = yy-1 },
-                    Point{ .x = xx,   .y = yy-1 },
-                    Point{ .x = xx+1, .y = yy-1 },
-                    Point{ .x = xx+1, .y = yy },
-                    Point{ .x = xx+1, .y = yy+1 },
-                    Point{ .x = xx,   .y = yy+1 },
-                    Point{ .x = xx-1, .y = yy+1 },
-                    Point{ .x = xx-1, .y = yy }
-                },
             };
         }
     }
@@ -180,6 +166,8 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.input = character;
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL1 = outL1;
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL2 = .CONTENT;
+            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL3 = .EMPTY_LINE;
+            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL4 = .NONE;
 
             x += 1;
         }
@@ -189,14 +177,15 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
 pub fn main() !void {
     initializeCellMatrix(&cellMatrix, markdownString[0..markdownString.len]);
 
-    var layer1CellBuffer = [_]u8{0} ** (128*128*5);
+    var cellBuffer3D = [_]u8{0} ** (128*128*5);
+    var currentInputVolume: bool = false; // "false" for First and "true" for Second
     var l1Count: usize = 0;
 
     for (cellMatrix) |col, x| {
         for (col) |_, y| {
             const cellPtr = &cellMatrix[y][x];
             if (cellPtr.* != null) {
-                layer1CellBuffer[l1Count] = @enumToInt(cellPtr.*.?.outputL1);
+                cellBuffer3D[l1Count] = @enumToInt(cellPtr.*.?.outputL1);
             }
             l1Count += 1;
         }
@@ -243,7 +232,7 @@ pub fn main() !void {
         .type = @enumToInt(ocl.CLChannelType.UNSIGNED_INT8)
     };
 
-    var inputImage = try ocl.createImage(
+    var firstVolume = try ocl.createImage(
         ctx,
         .READ_WRITE,
         imageFormat,
@@ -251,35 +240,35 @@ pub fn main() !void {
         128,
         5
     );
-    defer ocl.releaseMemObj(inputImage);
+    defer ocl.releaseMemObj(firstVolume);
 
-    var outputImage = try ocl.createImage(
+    var secondVolume = try ocl.createImage(
         ctx,
-        .WRITE_ONLY,
+        .READ_WRITE,
         imageFormat,
         128,
         128,
         5
     );
-    defer ocl.releaseMemObj(outputImage);
+    defer ocl.releaseMemObj(secondVolume);
 
     // Because this call is "blocking" it means that it will make sure that this "command"
     // will runs ASAP and will wait until it's written.
     // Altarnatively I could use events to make this not blocking.
     try ocl.enqueueWriteImageWithData(
         commandQueue,
-        inputImage,
+        firstVolume,
         true,
         [3]usize{0,0,0},
         [3]usize{128,128,5},
         128 * @sizeOf(u8),
         0,
         u8,
-        &layer1CellBuffer
+        &cellBuffer3D
     );
 
-    try ocl.setKernelArg(kernel, 0, &inputImage);
-    try ocl.setKernelArg(kernel, 1, &outputImage);
+    try ocl.setKernelArg(kernel, 0, &firstVolume);
+    try ocl.setKernelArg(kernel, 1, &secondVolume);
 
     // So this will NOT start the command immediately
     try ocl.enqueueNDRangeKernelWithoutEvents(
@@ -296,14 +285,14 @@ pub fn main() !void {
     // command was to run the kernel.
     try ocl.enqueueReadImageWithData(
         commandQueue,
-        outputImage,
+        secondVolume,
         true,
         [3]usize{0,0,0},
         [3]usize{128,128,5},
         128 * @sizeOf(u8),
         0,
         u8,
-        &layer1CellBuffer
+        &cellBuffer3D
     );
 
     const GRID_SIZE = 6;
@@ -320,9 +309,19 @@ pub fn main() !void {
 
     var colCount: c_int = 0;
     var rowCount: c_int = 0;
+    var layerCount: c_int = 0;
 
     var mouseX: c_int = 0;
     var mouseY: c_int = 0;
+    var zIndex: c_int = 0;
+    var currentCellVal: c_int = -1;
+    var currentStep: c_int = 1;
+    var totalSteps: c_int = 1;
+
+    // for (cellBuffer3D) |item| {
+    //     print("{d}", .{item});
+    // }
+    // print("\n", .{});
 
     while (!rl.WindowShouldClose()) {
 
@@ -334,44 +333,123 @@ pub fn main() !void {
         if (mouseX >= 127) mouseX = 127;
         if (mouseY >= 127) mouseY = 127;
 
+        if (rl.IsKeyPressed(.KEY_RIGHT)) {
+            // Swap volumes
+            var inVolPtr = if (!currentInputVolume) &secondVolume else &firstVolume;
+            var outVolPtr = if (!currentInputVolume) &firstVolume else &secondVolume;
+            try ocl.setKernelArg(kernel, 0, inVolPtr);
+            try ocl.setKernelArg(kernel, 1, outVolPtr);
+
+            // Add program execution to queue
+            try ocl.enqueueNDRangeKernelWithoutEvents(
+                commandQueue,
+                kernel,
+                3,
+                [3]usize{128,128,5},
+                null
+            );
+
+            // Read the result when ready
+            try ocl.enqueueReadImageWithData(
+                commandQueue,
+                outVolPtr.*,
+                true,
+                [3]usize{0,0,0},
+                [3]usize{128,128,5},
+                128 * @sizeOf(u8),
+                0,
+                u8,
+                &cellBuffer3D
+            );
+
+            currentInputVolume = !currentInputVolume;
+            currentStep += 1;
+        }
+
+        if (rl.IsKeyPressed(.KEY_ONE)) zIndex = 0;
+        if (rl.IsKeyPressed(.KEY_TWO)) zIndex = 1;
+        if (rl.IsKeyPressed(.KEY_THREE)) zIndex = 2;
+        if (rl.IsKeyPressed(.KEY_FOUR)) zIndex = 3;
+        if (rl.IsKeyPressed(.KEY_FIVE)) zIndex = 4;
+        if (rl.IsKeyPressed(.KEY_UP)) zIndex += 1;
+        if (rl.IsKeyPressed(.KEY_DOWN)) zIndex -= 1;
+
         rl.BeginDrawing();
 
-        rl.ClearBackground(rl.GetColor(0x282828FF));
+        rl.ClearBackground(rl.BLACK);
 
-        rl.DrawRectangle(UIXStart, 0, UIWidth, screenHeight, rl.LIGHTGRAY);
-        rl.DrawText(rl.TextFormat("X: %03i", mouseX), (UIXStart) + 8, 8, 10, rl.BLACK);
-        rl.DrawText(rl.TextFormat("Y: %03i", mouseY), (UIXStart) + 8, 24, 10, rl.BLACK);
+        rl.DrawRectangle(UIXStart, 0, UIWidth, screenHeight, rl.GetColor(0x282828FF));
+        rl.DrawText(rl.TextFormat("X: %03i", mouseX), (UIXStart) + 8, 8, 20, rl.LIGHTGRAY);
+        rl.DrawText(rl.TextFormat("Y: %03i", mouseY), (UIXStart) + 8, 28, 20, rl.LIGHTGRAY);
+        rl.DrawText(rl.TextFormat("Z: %03i", zIndex), (UIXStart) + 8, 48, 20, rl.LIGHTGRAY);
+
+        rl.DrawText(
+            rl.TextFormat("Step: %i / %i", currentStep, totalSteps),
+            (UIXStart) + 8, 78, 20, rl.LIGHTGRAY
+        );
+
+        rl.DrawText(
+            rl.TextFormat("Val: %i", currentCellVal),
+            (UIXStart) + 8, 98, 20, rl.LIGHTGRAY
+        );
 
         var tooltipText: ?[*:0]const u8 = null;
+        var cellColor: rl.Color = undefined;
 
-        for (layer1CellBuffer) |item| {
-            const cellColor = switch (@intToEnum(CharFeature, item)) {
-                .@"abc", .@"123", .@"sym" => rl.GetColor(0xC6C6C6FF),
-                // .@".", => rl.GetColor(),
-                .@">",
-                .@"#" => rl.GetColor(0xFF0000FF),
-                .@"~",
-                .@"*",
-                .@"-" => rl.GetColor(0x008000FF),
-                .@"(",
-                .@")",
-                .@"[",
-                .@"]" => rl.GetColor(0xFFFF00FF),
-                .@"`" => rl.GetColor(0x008080FF),
-                .@"\\" => rl.GetColor(0x0000FFFF),
-                else => rl.GetColor(0xFFFFFFFF)
-            };
+        for (cellBuffer3D) |item| {
+            if (zIndex == 0) {
+                cellColor = switch (@intToEnum(CharFeature, item)) {
+                    .@"abc", .@"123", .@"sym", .@"." => rl.GetColor(0xC6C6C6FF),
+                    .@">",
+                    .@"#" => rl.GetColor(0xFF0000FF),
+                    .@"~",
+                    .@"*",
+                    .@"-" => rl.GetColor(0x008000FF),
+                    .@"(",
+                    .@")",
+                    .@"[",
+                    .@"]" => rl.GetColor(0xFFFF00FF),
+                    .@"`" => rl.GetColor(0x008080FF),
+                    .@"\\" => rl.GetColor(0x0000FFFF),
+                    else => rl.GetColor(0x00FF00FF)
+                };
+            } else if (zIndex == 1) {
+                cellColor = switch (@intToEnum(TokenFeature, item)) {
+                    .CONTENT => rl.GetColor(0xC6C6C630),
+                    .SNIP_CONTENT => rl.GetColor(0xae523fFF),
+                    .SNIP_LANG => rl.GetColor(0xFFFF00FF),
+                    .SNIP_FIRST => rl.GetColor(0xc40000FF),
+                    .SNIP_MIDDLE => rl.GetColor(0xe20057FF),
+                    .SNIP_LAST => rl.GetColor(0xff00aeFF),
+                    .HEAD_SINGLE => rl.GetColor(0x60ffdfFF),
+                    .HEAD_FIRST => rl.GetColor(0x44acd3FF),
+                    .HEAD_MIDDLE => rl.GetColor(0x275ac8FF),
+                    .HEAD_LAST => rl.GetColor(0x0b07bcFF),
+                    else => rl.GetColor(0x00FF00FF)
+                };
+            }
 
+            // @IMPROVEMENT: Only draw if it's in viewport
             if (item > 0) {
                 rl.DrawCircle(
                     (GRID_SIZE/2) + (colCount * GRID_SIZE),
-                    (GRID_SIZE/2) + (rowCount * GRID_SIZE),
+                    ((GRID_SIZE/2) + (rowCount * GRID_SIZE)) - (zIndex * 128 * GRID_SIZE),
                     GRID_SIZE/3,
                     cellColor
                 );
-                if (mouseX == colCount and mouseY == rowCount) {
+            }
+
+            if (mouseX == colCount and (mouseY + (zIndex * 128)) == rowCount) {
+                currentCellVal = @intCast(c_int, item);
+
+                if (zIndex == 0 and item != 0) {
                     tooltipText = @tagName(@intToEnum(CharFeature, item));
+                } else if (item == 0 and zIndex == 0) {
+                    tooltipText = "SPACE";
                 }
+
+                if (zIndex == 1)
+                    tooltipText = @tagName(@intToEnum(TokenFeature, item));
             }
 
             colCount += 1;
@@ -382,18 +460,19 @@ pub fn main() !void {
             }
 
             if (rowCount == 128) {
-                break;
+                layerCount += 1;
             }
         }
 
         colCount = 0;
         rowCount = 0;
+        layerCount = 0;
 
         if (tooltipText != null) {
             rl.DrawRectangle(
                 rl.GetMouseX() + 24,
                 rl.GetMouseY(),
-                24,
+                70,
                 12,
                 rl.WHITE
             );

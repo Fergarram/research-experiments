@@ -1,4 +1,9 @@
 
+Improvements:
+
+- History Access and Export
+- Hot-reload OpenCL C program
+
 --------------------------------------------------------------------------------
 
 How do I condense multiple cells into a single one?
@@ -12,9 +17,9 @@ I'm having a realization again. My approach has been the wrong approach. I need 
 
 #We could have a title like this
 
- #We could have a title like this
+  # We could have a title like this
 
- #  We could have a title like this
+ #   We could have a title like this
 ```
 
 The second sample line above is the trickiest one for sure, but the others would in theory make it possible to parse correctly without the need of a prediction system.
