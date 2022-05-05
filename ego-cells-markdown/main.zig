@@ -22,12 +22,12 @@ const Block = enum(u8) {
 };
 
 const LineFeature = enum(u8) {
+    EMPTY_LINE,
     HEADING,
-    SNIP_START,
+    SNIP_BEGIN,
     SNIP_END,
     SNIP_TEXT,
     TEXT,
-    EMPTY_LINE
 };
 
 
@@ -427,6 +427,16 @@ pub fn main() !void {
                     .HEAD_LAST => rl.GetColor(0x0b07bcFF),
                     else => rl.GetColor(0x00FF00FF)
                 };
+            } else if (zIndex == 2) {
+                cellColor = switch (item) {
+                    // WTF with this bug?
+                    @enumToInt(LineFeature.HEADING) => rl.GetColor(0x0000FFFF),
+                    @enumToInt(LineFeature.SNIP_BEGIN) => rl.GetColor(0xFF00FFFF),
+                    @enumToInt(LineFeature.SNIP_END) => rl.GetColor(0x8000FFFF),
+                    @enumToInt(LineFeature.SNIP_TEXT) => rl.GetColor(0xFFFF00FF),
+                    @enumToInt(LineFeature.TEXT) => rl.GetColor(0xC6C6C630),
+                    else => rl.GetColor(0x00FF00FF)
+                };
             }
 
             // @IMPROVEMENT: Only draw if it's in viewport
@@ -450,6 +460,9 @@ pub fn main() !void {
 
                 if (zIndex == 1)
                     tooltipText = @tagName(@intToEnum(TokenFeature, item));
+
+                if (zIndex == 2)
+                    tooltipText = @tagName(@intToEnum(LineFeature, item));
             }
 
             colCount += 1;
