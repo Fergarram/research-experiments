@@ -51,12 +51,6 @@
 // Execution
 //
 
-// @TODO: Write to the other layers, and remember this will be done in passes.
-//
-//        In reality, all the trouble I went through was more about learning
-//        about parallel computing. In any case I'll do it in passes which
-//        actually kinda works because I'll be able to see the history.
-
 __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_img) {
     int2 coord  = (int2) (get_global_id(0), get_global_id(1));
     int2 left   = (int2) (coord.x-1, coord.y);
@@ -178,7 +172,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         )
     ) {
         set_layer_value(out_img, coord, 2, TK_SNIP_LANG);
-        set_layer_value(out_img, coord, 3, LN_SNIP_BEGIN);
+        set_layer_value(out_img, coord, 3, LN_SNIP_BEGIN); // This shouldn't be here I think
     }
 
     // LN_SNIP_BEGIN

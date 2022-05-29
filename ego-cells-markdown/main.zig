@@ -333,7 +333,7 @@ pub fn main() !void {
         if (mouseX >= 127) mouseX = 127;
         if (mouseY >= 127) mouseY = 127;
 
-        if (rl.IsKeyPressed(.KEY_RIGHT)) {
+        if (rl.IsKeyDown(.KEY_RIGHT)) {
             // Swap volumes
             var inVolPtr = if (!currentInputVolume) &secondVolume else &firstVolume;
             var outVolPtr = if (!currentInputVolume) &firstVolume else &secondVolume;
@@ -399,7 +399,7 @@ pub fn main() !void {
         for (cellBuffer3D) |item| {
             if (zIndex == 0) {
                 cellColor = switch (@intToEnum(CharFeature, item)) {
-                    .@"abc", .@"123", .@"sym", .@"." => rl.GetColor(0xC6C6C6FF),
+                    .@"abc", .@"123", .@"sym", .@"." => rl.GetColor(0xC6C6C660),
                     .@">",
                     .@"#" => rl.GetColor(0xFF0000FF),
                     .@"~",
@@ -429,7 +429,7 @@ pub fn main() !void {
                 };
             } else if (zIndex == 2) {
                 cellColor = switch (item) {
-                    // WTF with this bug?
+                    // @TODO: Report bug with enums
                     @enumToInt(LineFeature.HEADING) => rl.GetColor(0x0000FFFF),
                     @enumToInt(LineFeature.SNIP_BEGIN) => rl.GetColor(0xFF00FFFF),
                     @enumToInt(LineFeature.SNIP_END) => rl.GetColor(0x8000FFFF),
