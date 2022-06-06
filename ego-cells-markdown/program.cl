@@ -83,6 +83,8 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         next = right;
     }
 
+    uint4 firstInRowL3 = get_layer_value(in_img, (int2) (0, coord.y), 3);
+
     uint4 selfL1 = get_layer_value(in_img, coord, 1);
     uint4 selfL2 = get_layer_value(in_img, coord, 2);
     uint4 selfL3 = get_layer_value(in_img, coord, 3);
@@ -199,6 +201,11 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         set_layer_value(out_img, coord, 2, TK_SNIP_LANG);
     }
 
+    // SNIP_CONTENT
+    // if (selfL3.x == LN_SNIP_TEXT) {
+    //     set_layer_value(out_img, coord, 2, TK_SNIP_CONTENT);
+    // }
+
     // LN_TEXT
     if (
         (
@@ -213,7 +220,8 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
                 topL3.x == LN_TEXT ||
                 bottomL3.x == LN_TEXT ||
                 leftL3.x == LN_TEXT ||
-                rightL3.x == LN_TEXT
+                rightL3.x == LN_TEXT ||
+                firstInRowL3.x == LN_TEXT
             )
         ) ||
         (
@@ -225,7 +233,8 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
             ) &&
             (
                 top_null(coord) ||
-                bottom_null(coord)
+                bottom_null(coord) ||
+                topL3.x == LN_SNIP_END
             )
         )
     ) {
@@ -237,6 +246,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     if (
         leftL3.x == LN_HEADING ||
         rightL3.x == LN_HEADING ||
+        firstInRowL3.x == LN_HEADING ||
         (
             (
                 selfL2.x != TK_SNIP_FIRST &&
@@ -250,7 +260,10 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
                 selfL2.x == TK_HEAD_MIDDLE || 
                 selfL2.x == TK_HEAD_LAST
             ) &&
-            top_null(coord) 
+            (
+                top_null(coord) ||
+                selfL3.x == LN_TEXT
+            )
         )
     ) {
         set_layer_value(out_img, coord, 3, LN_HEADING);
@@ -260,6 +273,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     if (
         leftL3.x == LN_SNIP_BEGIN ||
         rightL3.x == LN_SNIP_BEGIN ||
+        firstInRowL3.x == LN_SNIP_BEGIN ||
         (
             (
                 selfL2.x == TK_SNIP_FIRST ||
@@ -279,18 +293,45 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     
     // LN_SNIP_TEXT
     if (
-        selfL3.x != LN_SNIP_BEGIN &&
-        selfL3.x != LN_SNIP_END &&
+        firstInRowL3.x == LN_SNIP_TEXT ||
         (
-            topL3.x == LN_SNIP_BEGIN ||
-            bottomL3.x == LN_SNIP_END ||
-            leftL3.x == LN_SNIP_TEXT ||
-            rightL3.x == LN_SNIP_TEXT ||
-            topL3.x == LN_SNIP_TEXT ||
-            bottomL3.x == LN_SNIP_TEXT
+            selfL3.x != LN_SNIP_BEGIN &&
+            selfL3.x != LN_SNIP_END &&
+            selfL2.x != TK_SNIP_FIRST &&
+            selfL2.x != TK_SNIP_MIDDLE &&
+            selfL2.x != TK_SNIP_LAST &&
+            topL3.x != LN_SNIP_END &&
+            topL3.x != LN_TEXT &&
+            leftL3.x != LN_TEXT &&
+            leftL3.x != LN_HEADING &&
+            (
+                topL3.x == LN_SNIP_BEGIN ||
+                bottomL3.x == LN_SNIP_END ||
+                leftL3.x == LN_SNIP_TEXT ||
+                rightL3.x == LN_SNIP_TEXT ||
+                topL3.x == LN_SNIP_TEXT ||
+                bottomL3.x == LN_SNIP_TEXT
+            )
         )
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_TEXT);
+    }
+    
+    // LN_SNIP_END
+    if (
+        leftL3.x == LN_SNIP_END ||
+        rightL3.x == LN_SNIP_END ||
+        firstInRowL3.x == LN_SNIP_END ||
+        (
+            topL3.x == LN_SNIP_TEXT &&
+            (
+                selfL2.x == TK_SNIP_FIRST ||
+                selfL2.x == TK_SNIP_MIDDLE ||
+                selfL2.x == TK_SNIP_LAST
+            )
+        )
+    ) {
+        set_layer_value(out_img, coord, 3, LN_SNIP_END);
     }
 
     // Passing the first layer from in_img to out_img
