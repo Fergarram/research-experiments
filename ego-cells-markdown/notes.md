@@ -1,18 +1,7 @@
 TODO:
 
 [x] Add sequential preconnections
-
-[ ] Implement raycasting feature 
-    
-    My new problem is that raycasting will require for loops in each cell code. That's not going to be very
-    cheap. So, I'd want to think of a better solution.
-
-    Yeah, I'm not sure. I'm confused. I don't want to rely on for loops, they seem expensive!
-
-    How can I preconect a type of cell that can receive a question like from this point in this direction,
-    is there this line (l3) value activated?
-
-[ ] Continue with the actual parsing of MD
+[ ] Make sure that the code works accurately on multiple correct scenarios.
 
 --------------------------------------------------------------------------------
 
