@@ -143,9 +143,6 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
 
             var outL1: CharFeature = undefined;
 
-            // NOTE: One could argue that the conditions below should really go in the
-            //       cell loop. But, for practical reasons it's better to be here since
-            //       this is always static (for now).
             if (ascii.isSpace(character) or ascii.isBlank(character)) outL1 = .@" "
             else if (ascii.isAlpha(character)) outL1 = .@"abc"
             else if (ascii.isDigit(character)) outL1 = .@"123"
@@ -164,7 +161,7 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
             else outL1 = .@"sym";
 
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.input = character;
-            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL1 = outL1;
+            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL1 = outL1; 
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL2 = .CONTENT;
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL3 = .EMPTY_LINE;
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL4 = .NONE;
@@ -333,7 +330,7 @@ pub fn main() !void {
         if (mouseX >= 127) mouseX = 127;
         if (mouseY >= 127) mouseY = 127;
 
-        if (rl.IsKeyDown(.KEY_RIGHT)) {
+        if (rl.IsKeyReleased(.KEY_RIGHT)) {
             // Swap volumes
             var inVolPtr = if (!currentInputVolume) &secondVolume else &firstVolume;
             var outVolPtr = if (!currentInputVolume) &firstVolume else &secondVolume;
@@ -413,6 +410,7 @@ pub fn main() !void {
                     .@"\\" => rl.GetColor(0x0000FFFF),
                     else => rl.GetColor(0x00FF00FF)
                 };
+
             } else if (zIndex == 1) {
                 cellColor = switch (@intToEnum(TokenFeature, item)) {
                     .CONTENT => rl.GetColor(0xC6C6C630),
@@ -427,6 +425,7 @@ pub fn main() !void {
                     .HEAD_LAST => rl.GetColor(0x0b07bcFF),
                     else => rl.GetColor(0x00FF00FF)
                 };
+
             } else if (zIndex == 2) {
                 cellColor = switch (item) {
                     // @TODO: Report bug with enums

@@ -52,12 +52,37 @@
 //
 
 __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_img) {
+    int4 imgDim = get_image_dim(in_img);
     int2 coord  = (int2) (get_global_id(0), get_global_id(1));
     int2 left   = (int2) (coord.x-1, coord.y);
     int2 right  = (int2) (coord.x+1, coord.y);
     int2 top    = (int2) (coord.x, coord.y-1);
     int2 bottom = (int2) (coord.x, coord.y+1);
+    int2 prev = (int2) (-1, -1); // Represents null
+    int2 next = (int2) (-1, -1); // Represents null
+    bool topWall = coord.y-1 == -1;
+    bool leftWall = coord.x-1 == -1;
+    bool bottomWall = coord.y+1 == imgDim.x; // Using X here assumes size is always square
+    bool rightWall = coord.x+1 == imgDim.x;
+
+    // If first in row but not the first row in buffer jump to the last col in previous row.
+    if (coord.x == 0 && coord.y != 0) {
+        prev = (int2) (imgDim.x-1, coord.y-1);
+
+    // Otherwise just use the left neighbor
+    } else if (coord.x > 0) {
+        prev = left;
+    }
+
+    // If last in row but not last row in buffer jump to the first col in the next row.
+    if (coord.x == imgDim.x-1 && coord.y != imgDim.y-1) {
+        next = (int2) (0, coord.y+1);
     
+    // Otherwise just use the right neighbor
+    } else if (coord.x < imgDim.x-1) {
+        next = right;
+    }
+
     uint4 selfL1 = get_layer_value(in_img, coord, 1);
     uint4 selfL2 = get_layer_value(in_img, coord, 2);
     uint4 selfL3 = get_layer_value(in_img, coord, 3);
@@ -172,22 +197,100 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         )
     ) {
         set_layer_value(out_img, coord, 2, TK_SNIP_LANG);
-        set_layer_value(out_img, coord, 3, LN_SNIP_BEGIN); // This shouldn't be here I think
+    }
+
+    // LN_TEXT
+    if (
+        (
+            selfL2.x != TK_SNIP_FIRST &&
+            selfL2.x != TK_SNIP_MIDDLE && 
+            selfL2.x != TK_SNIP_LAST &&
+            selfL2.x != TK_SNIP_LANG &&
+            selfL3.x != LN_HEADING &&
+            topL3.x != LN_SNIP_BEGIN &&
+            leftL3.x != LN_SNIP_TEXT &&
+            (
+                topL3.x == LN_TEXT ||
+                bottomL3.x == LN_TEXT ||
+                leftL3.x == LN_TEXT ||
+                rightL3.x == LN_TEXT
+            )
+        ) ||
+        (
+            (
+                selfL2.x != TK_HEAD_SINGLE && 
+                selfL2.x != TK_HEAD_FIRST && 
+                selfL2.x != TK_HEAD_MIDDLE && 
+                selfL2.x != TK_HEAD_LAST
+            ) &&
+            (
+                top_null(coord) ||
+                bottom_null(coord)
+            )
+        )
+    ) {
+        // @TODO: Make this not work with empty lines
+        set_layer_value(out_img, coord, 3, LN_TEXT);
+    }
+    
+    // LN_HEADING
+    if (
+        leftL3.x == LN_HEADING ||
+        rightL3.x == LN_HEADING ||
+        (
+            (
+                selfL2.x != TK_SNIP_FIRST &&
+                selfL2.x != TK_SNIP_MIDDLE && 
+                selfL2.x != TK_SNIP_LAST &&
+                selfL2.x != TK_SNIP_LANG 
+            ) &&
+            (
+                selfL2.x == TK_HEAD_SINGLE || 
+                selfL2.x == TK_HEAD_FIRST || 
+                selfL2.x == TK_HEAD_MIDDLE || 
+                selfL2.x == TK_HEAD_LAST
+            ) &&
+            top_null(coord) 
+        )
+    ) {
+        set_layer_value(out_img, coord, 3, LN_HEADING);
     }
 
     // LN_SNIP_BEGIN
     if (
+        leftL3.x == LN_SNIP_BEGIN ||
+        rightL3.x == LN_SNIP_BEGIN ||
         (
-            selfL1.x == CH_SPACE ||
-            selfL1.x == CH_TICK ||
-            selfL2.x == TK_SNIP_LANG
-        ) &&
-        (
-            leftL3.x == LN_SNIP_BEGIN ||
-            rightL3.x == LN_SNIP_BEGIN
+            (
+                selfL2.x == TK_SNIP_FIRST ||
+                selfL2.x == TK_SNIP_MIDDLE ||
+                selfL2.x == TK_SNIP_LAST ||
+                selfL2.x == TK_SNIP_LANG
+            ) &&
+            (
+                top_null(coord) ||
+                topL3.x == LN_HEADING ||
+                topL3.x == LN_TEXT
+            )
         )
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_BEGIN);
+    }
+    
+    // LN_SNIP_TEXT
+    if (
+        selfL3.x != LN_SNIP_BEGIN &&
+        selfL3.x != LN_SNIP_END &&
+        (
+            topL3.x == LN_SNIP_BEGIN ||
+            bottomL3.x == LN_SNIP_END ||
+            leftL3.x == LN_SNIP_TEXT ||
+            rightL3.x == LN_SNIP_TEXT ||
+            topL3.x == LN_SNIP_TEXT ||
+            bottomL3.x == LN_SNIP_TEXT
+        )
+    ) {
+        set_layer_value(out_img, coord, 3, LN_SNIP_TEXT);
     }
 
     // Passing the first layer from in_img to out_img

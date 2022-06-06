@@ -21,7 +21,7 @@ echo "Let's try some _markdown_ ~~crazy~~ [shit](shit.com)"
 ```
 
 This below should make the block fail
-```````
+```
 bla bla "```" The middle tick thinks that it's a SNIP_MIDDLE
 which probably means that this will fail as well: ### haha
 ```
