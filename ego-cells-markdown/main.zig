@@ -330,7 +330,7 @@ pub fn main() !void {
         if (mouseX >= 127) mouseX = 127;
         if (mouseY >= 127) mouseY = 127;
 
-        if (rl.IsKeyReleased(.KEY_RIGHT)) {
+        if (rl.IsKeyDown(.KEY_RIGHT)) {
             // Swap volumes
             var inVolPtr = if (!currentInputVolume) &secondVolume else &firstVolume;
             var outVolPtr = if (!currentInputVolume) &firstVolume else &secondVolume;

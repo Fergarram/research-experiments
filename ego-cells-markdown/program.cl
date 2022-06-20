@@ -116,23 +116,27 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     // uint4 bottomL5 = get_layer_value(in_img, bottom, 5);
 
     // CONTENT
-    // if (
-    //     selfL1.x != CH_SPACE
-    // ) {
-    //     set_layer_value(out_img, coord, 2, TK_CONTENT);
-    // }
+    if (
+        selfL1.x == CH_ABC ||
+        selfL1.x == CH_123 ||
+        selfL1.x == CH_SYM ||
+        selfL1.x == CH_DOT
+    ) {
+        set_layer_value(out_img, coord, 2, TK_CONTENT);
+    }
 
     // HEAD_SINGLE
-    if (
+    else if (
         selfL1.x == CH_HASH &&
         left_null(coord) &&
-        rightL1.x == CH_SPACE
+        rightL1.x == CH_SPACE &&
+        selfL3.x != LN_SNIP_TEXT
     ) {
         set_layer_value(out_img, coord, 2, TK_HEAD_SINGLE);
     }
 
     // HEAD_FIRST
-    if (
+    else if (
         selfL1.x == CH_HASH &&
         left_null(coord) &&
         rightL1.x == CH_HASH
@@ -141,7 +145,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // HEAD_MIDDLE
-    if (
+    else if (
         selfL1.x == CH_HASH &&
         leftL1.x == CH_HASH &&
         rightL1.x == CH_HASH &&
@@ -151,7 +155,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // HEAD_LAST
-    if (
+    else if (
         selfL1.x == CH_HASH &&
         leftL1.x == CH_HASH &&
         rightL1.x == CH_SPACE &&
@@ -161,7 +165,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // SNIP_FIRST
-    if (
+    else if (
         selfL1.x == CH_TICK &&
         left_null(coord) &&
         rightL1.x == CH_TICK
@@ -170,7 +174,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // SNIP_MIDDLE
-    if (
+    else if (
         selfL1.x == CH_TICK &&
         leftL1.x == CH_TICK &&
         rightL1.x == CH_TICK &&
@@ -180,7 +184,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // SNIP_LAST
-    if (
+    else if (
         selfL1.x == CH_TICK &&
         leftL1.x == CH_TICK &&
         (rightL1.x == CH_SPACE || rightL1.x == CH_ABC) &&
@@ -190,7 +194,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // SNIP_LANG
-    if (
+    else if (
         selfL1.x == CH_ABC &&
         (rightL1.x == CH_SPACE || rightL1.x == CH_ABC) &&
         (
@@ -202,9 +206,14 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // SNIP_CONTENT
-    // if (selfL3.x == LN_SNIP_TEXT) {
-    //     set_layer_value(out_img, coord, 2, TK_SNIP_CONTENT);
-    // }
+    else if (selfL3.x == LN_SNIP_TEXT) {
+        set_layer_value(out_img, coord, 2, TK_SNIP_CONTENT);
+    }
+
+    // L2 ELSE
+    else {
+        set_layer_value(out_img, coord, 2, TK_EMPTY);
+    }
 
     // LN_TEXT
     if (
@@ -238,12 +247,11 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
             )
         )
     ) {
-        // @TODO: Make this not work with empty lines
         set_layer_value(out_img, coord, 3, LN_TEXT);
     }
     
     // LN_HEADING
-    if (
+    else if (
         leftL3.x == LN_HEADING ||
         rightL3.x == LN_HEADING ||
         firstInRowL3.x == LN_HEADING ||
@@ -270,10 +278,10 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
 
     // LN_SNIP_BEGIN
-    if (
+    else if (
+        firstInRowL3.x == LN_SNIP_BEGIN ||
         leftL3.x == LN_SNIP_BEGIN ||
         rightL3.x == LN_SNIP_BEGIN ||
-        firstInRowL3.x == LN_SNIP_BEGIN ||
         (
             (
                 selfL2.x == TK_SNIP_FIRST ||
@@ -288,11 +296,12 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
             )
         )
     ) {
+        // printf("Here\n");
         set_layer_value(out_img, coord, 3, LN_SNIP_BEGIN);
     }
     
     // LN_SNIP_TEXT
-    if (
+    else if (
         firstInRowL3.x == LN_SNIP_TEXT ||
         (
             selfL3.x != LN_SNIP_BEGIN &&
@@ -318,7 +327,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     }
     
     // LN_SNIP_END
-    if (
+    else if (
         leftL3.x == LN_SNIP_END ||
         rightL3.x == LN_SNIP_END ||
         firstInRowL3.x == LN_SNIP_END ||
@@ -332,6 +341,11 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         )
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_END);
+    }
+
+    // L3 ELSE
+    else {
+        set_layer_value(out_img, coord, 3, LN_EMPTY_LINE);
     }
 
     // Passing the first layer from in_img to out_img
