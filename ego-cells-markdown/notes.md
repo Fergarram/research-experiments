@@ -1,7 +1,9 @@
 TODO:
 
-[x] Add sequential preconnections
-[ ] Make sure that the code works accurately on multiple correct scenarios.
+[ ] Encode neighboring rules into a string or set of strings
+[ ] Ability to change the OpenCL program in run-time
+
+NOTAS @beto: Todo lo de abajo de aqui esta outdated.
 
 --------------------------------------------------------------------------------
 
