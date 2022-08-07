@@ -24,8 +24,7 @@ const Block = enum(u8) {
 const LineFeature = enum(u8) {
     EMPTY_LINE,
     HEADING,
-    SNIP_BEGIN,
-    SNIP_END,
+    SNIP_BORDER,
     SNIP_TEXT,
     TEXT,
 };
@@ -33,30 +32,16 @@ const LineFeature = enum(u8) {
 
 const TokenFeature = enum(u8) {
     EMPTY,
-    CONTENT,
-    HEAD_SINGLE,
-    HEAD_FIRST,
-    HEAD_MIDDLE,
-    HEAD_LAST,
-    SNIP_FIRST,
-    SNIP_MIDDLE,
-    SNIP_LAST,
-    SNIP_LANG,
-    SNIP_CONTENT,
-    SNIP_SINGLE,
-    UNDR_START,
-    UNDR_END,
-    BOLD_START,
-    BOLD_END,
-    ITAL_START,
-    ITAL_END,
-    STRK_START,
-    STRK_END,
-    LINK_CONTENT_START,
-    LINK_CONTENT_END,
-    LINK_URL_START,
-    LINK_URL_END,
-    QUOT_START
+    PARAGRAPH,
+    HEADING_1,
+    HEADING_2,
+    HEADING_3,
+    HEADING_4,
+    HEADING_5,
+    HEADING_6,
+    UL_ITEM,
+    OL_ITEM,
+    SNIP_BLOCK
 };
 
 const CharFeature = enum(u8) {
@@ -162,7 +147,7 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
 
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.input = character;
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL1 = outL1; 
-            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL2 = .CONTENT;
+            matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL2 = .EMPTY;
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL3 = .EMPTY_LINE;
             matrix.*[@intCast(usize, x)][@intCast(usize, y)].?.outputL4 = .NONE;
 
@@ -363,13 +348,14 @@ pub fn main() !void {
             currentStep += 1;
         }
 
-        if (rl.IsKeyPressed(.KEY_ONE)) zIndex = 0;
-        if (rl.IsKeyPressed(.KEY_TWO)) zIndex = 1;
-        if (rl.IsKeyPressed(.KEY_THREE)) zIndex = 2;
-        if (rl.IsKeyPressed(.KEY_FOUR)) zIndex = 3;
-        if (rl.IsKeyPressed(.KEY_FIVE)) zIndex = 4;
-        if (rl.IsKeyPressed(.KEY_UP)) zIndex += 1;
-        if (rl.IsKeyPressed(.KEY_DOWN)) zIndex -= 1;
+        if (rl.IsKeyPressed(.KEY_ONE))   zIndex  = 0;
+        if (rl.IsKeyPressed(.KEY_TWO))   zIndex  = 1;
+        if (rl.IsKeyPressed(.KEY_THREE)) zIndex  = 2;
+        if (rl.IsKeyPressed(.KEY_FOUR))  zIndex  = 3;
+        if (rl.IsKeyPressed(.KEY_FIVE))  zIndex  = 4;
+
+        if (rl.IsKeyPressed(.KEY_UP))    zIndex += 1;
+        if (rl.IsKeyPressed(.KEY_DOWN))  zIndex -= 1;
 
         rl.BeginDrawing();
 
@@ -412,26 +398,24 @@ pub fn main() !void {
                 };
 
             } else if (zIndex == 1) {
-                cellColor = switch (@intToEnum(TokenFeature, item)) {
-                    .CONTENT => rl.GetColor(0xC6C6C630),
-                    .SNIP_CONTENT => rl.GetColor(0xae523fFF),
-                    .SNIP_LANG => rl.GetColor(0xFFFF00FF),
-                    .SNIP_FIRST => rl.GetColor(0xc40000FF),
-                    .SNIP_MIDDLE => rl.GetColor(0xe20057FF),
-                    .SNIP_LAST => rl.GetColor(0xff00aeFF),
-                    .HEAD_SINGLE => rl.GetColor(0x60ffdfFF),
-                    .HEAD_FIRST => rl.GetColor(0x44acd3FF),
-                    .HEAD_MIDDLE => rl.GetColor(0x275ac8FF),
-                    .HEAD_LAST => rl.GetColor(0x0b07bcFF),
+                cellColor = switch (item) {
+                    // @TODO: Report bug with enums
+                    @enumToInt(TokenFeature.PARAGRAPH) => rl.GetColor(0xC6C6C660),
+                    @enumToInt(TokenFeature.HEADING_1) => rl.GetColor(0xFFFF00FF),
+                    @enumToInt(TokenFeature.HEADING_2) => rl.GetColor(0xc40000FF),
+                    @enumToInt(TokenFeature.HEADING_3) => rl.GetColor(0xe20057FF),
+                    @enumToInt(TokenFeature.HEADING_4) => rl.GetColor(0xff00aeFF),
+                    @enumToInt(TokenFeature.HEADING_5) => rl.GetColor(0x60ffdfFF),
+                    @enumToInt(TokenFeature.HEADING_6) => rl.GetColor(0x44acd3FF),
+                    @enumToInt(TokenFeature.UL_ITEM) => rl.GetColor(0x275ac8FF),
+                    @enumToInt(TokenFeature.OL_ITEM) => rl.GetColor(0x0b07bcFF),
                     else => rl.GetColor(0x00FF00FF)
                 };
 
             } else if (zIndex == 2) {
                 cellColor = switch (item) {
-                    // @TODO: Report bug with enums
                     @enumToInt(LineFeature.HEADING) => rl.GetColor(0x0000FFFF),
-                    @enumToInt(LineFeature.SNIP_BEGIN) => rl.GetColor(0xFF00FFFF),
-                    @enumToInt(LineFeature.SNIP_END) => rl.GetColor(0x8000FFFF),
+                    @enumToInt(LineFeature.SNIP_BORDER) => rl.GetColor(0xFF00FFFF),
                     @enumToInt(LineFeature.SNIP_TEXT) => rl.GetColor(0xFFFF00FF),
                     @enumToInt(LineFeature.TEXT) => rl.GetColor(0xC6C6C630),
                     else => rl.GetColor(0x00FF00FF)
@@ -497,6 +481,7 @@ pub fn main() !void {
             );
         }
 
+        // rl.DrawFPS(16,16);
         rl.EndDrawing();
     }
 
