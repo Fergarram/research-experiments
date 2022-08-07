@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind utilities;
+
+/*@layer utilities {}*/
+
+.draggable {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.card {
+	@apply bg-white text-gray-800 text-12 w-fit rounded-8 shadow-md transition p-4 focus:outline outline-3 outline-blue-300;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12),
+                0 1px 2px rgba(0,0,0,0.24);
+}
+
+.card:not(.card--drag):hover {
+    cursor: grab;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+}
+
+.card--drag {
+    cursor: grabbing;
+    transform: scale(1.01);
+    box-shadow: 0 19px 38px rgba(0,0,0,0.30), 0 15px 12px rgba(0,0,0,0.22);
+}
