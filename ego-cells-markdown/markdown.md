@@ -1,12 +1,12 @@
 # Part 1 - Game
 ## Introduction
-This is one of those projects which are born after a burst of excitement but you end up not 
+This is **one** of those projects which are *born* after a burst of excitement but you end up not 
 finishing it, to the #uncomfortable point were it isn’t good enough to publish but it is 
 good enough to talk about it.
 
 Do we support emojis? 🧠
 
-Some inlined `code` here and a test here: '`' wtf `\``. // Backslashing is manually processed
+Some inlined `code` here and a test here: wtf `\``. // Backslashing is manually processed
 
 So, in this series I will share with you how I retake this project and finish it to the MVP 
 point in ~~two weekends~~!
@@ -39,7 +39,7 @@ house. I would make different designs using tape, rubber bands, nails and color 
 
 ###### Just another test 6
 
-Anyways, I bought the thing and went on to enable development mode and got a Hello World 
+Anyways, I bought the thing and went on to **_enable development_** mode and got a Hello World 
 app running.
 
 A few months past by and suddenly decided I wanted to do something with it. I though of 

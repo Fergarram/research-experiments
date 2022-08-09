@@ -5,32 +5,33 @@ const rl = @import("raylib");
 const print = std.debug.print;
 const ascii = std.ascii;
 
-const Block = enum(u8) {
+const TokenFeature = enum(u8) {
+    EMPTY,
     NONE,
-    H1, H2, H3, H4, H5, H6,
-    PARAGRAPH,
-    UL_ITEM,
-    OL_ITEM,
     MONO,
     UNDERLINE,
     BOLD,
     ITALIC,
     STRIKE,
     LINK,
-    CODE_SNIPPET,
-    QUOTE
 };
 
-const LineFeature = enum(u8) {
+const TextType = enum(u8) {
+    EMPTY,
+    NONE,
+    MONO_BORDER,
+    MONO_TEXT,
+};
+
+const LineType = enum(u8) {
     EMPTY_LINE,
-    HEADING,
     SNIP_BORDER,
     SNIP_TEXT,
     TEXT,
 };
 
 
-const TokenFeature = enum(u8) {
+const BlockFeature = enum(u8) {
     EMPTY,
     PARAGRAPH,
     HEADING_1,
@@ -59,6 +60,7 @@ const CharFeature = enum(u8) {
     @"]",
     @"`",
     @"*",
+    @"__",
     @"\\",
     @">"
 };
@@ -79,9 +81,10 @@ const Cell = struct {
     input: u8 = undefined,
 
     outputL1: CharFeature = undefined,
-    outputL2: TokenFeature = undefined,
-    outputL3: LineFeature = undefined,
-    outputL4: Block = undefined,
+    outputL2: BlockFeature = undefined,
+    outputL3: LineType = undefined,
+    outputL4: TextType = undefined,
+    outputL5: TokenFeature = undefined,
 };
 
 const markdownString = @embedFile("./markdown.md");
@@ -141,6 +144,7 @@ fn initializeCellMatrix(matrix: *[128][128]?Cell, markdown: []const u8) void {
             else if (character == ']') outL1 = .@"]"
             else if (character == '`') outL1 = .@"`"
             else if (character == '*') outL1 = .@"*"
+            else if (character == '_') outL1 = .@"__"
             else if (character == '>') outL1 = .@">"
             else if (character == '\\') outL1 = .@"\\"
             else outL1 = .@"sym";
@@ -387,9 +391,10 @@ pub fn main() !void {
                     .@"#" => rl.GetColor(0xFF0000FF),
                     .@"~",
                     .@"*",
+                    .@"__",
                     .@"-" => rl.GetColor(0x008000FF),
                     .@"(",
-                    .@")",
+                    .@")" => rl.GetColor(0xFF8000FF),
                     .@"[",
                     .@"]" => rl.GetColor(0xFFFF00FF),
                     .@"`" => rl.GetColor(0x008080FF),
@@ -400,24 +405,44 @@ pub fn main() !void {
             } else if (zIndex == 1) {
                 cellColor = switch (item) {
                     // @TODO: Report bug with enums
-                    @enumToInt(TokenFeature.PARAGRAPH) => rl.GetColor(0xC6C6C660),
-                    @enumToInt(TokenFeature.HEADING_1) => rl.GetColor(0xFFFF00FF),
-                    @enumToInt(TokenFeature.HEADING_2) => rl.GetColor(0xc40000FF),
-                    @enumToInt(TokenFeature.HEADING_3) => rl.GetColor(0xe20057FF),
-                    @enumToInt(TokenFeature.HEADING_4) => rl.GetColor(0xff00aeFF),
-                    @enumToInt(TokenFeature.HEADING_5) => rl.GetColor(0x60ffdfFF),
-                    @enumToInt(TokenFeature.HEADING_6) => rl.GetColor(0x44acd3FF),
-                    @enumToInt(TokenFeature.UL_ITEM) => rl.GetColor(0x275ac8FF),
-                    @enumToInt(TokenFeature.OL_ITEM) => rl.GetColor(0x0b07bcFF),
+                    @enumToInt(BlockFeature.PARAGRAPH) => rl.GetColor(0xC6C6C660),
+                    @enumToInt(BlockFeature.HEADING_1),
+                    @enumToInt(BlockFeature.HEADING_2),
+                    @enumToInt(BlockFeature.HEADING_3),
+                    @enumToInt(BlockFeature.HEADING_4),
+                    @enumToInt(BlockFeature.HEADING_5),
+                    @enumToInt(BlockFeature.HEADING_6) => rl.GetColor(0xc40000FF),
+                    @enumToInt(BlockFeature.UL_ITEM) => rl.GetColor(0x275ac8FF),
+                    @enumToInt(BlockFeature.OL_ITEM) => rl.GetColor(0x275ac8FF),
+                    @enumToInt(BlockFeature.SNIP_BLOCK) => rl.GetColor(0xFFFF00FF),
                     else => rl.GetColor(0x00FF00FF)
                 };
 
             } else if (zIndex == 2) {
                 cellColor = switch (item) {
-                    @enumToInt(LineFeature.HEADING) => rl.GetColor(0x0000FFFF),
-                    @enumToInt(LineFeature.SNIP_BORDER) => rl.GetColor(0xFF00FFFF),
-                    @enumToInt(LineFeature.SNIP_TEXT) => rl.GetColor(0xFFFF00FF),
-                    @enumToInt(LineFeature.TEXT) => rl.GetColor(0xC6C6C630),
+                    @enumToInt(LineType.SNIP_BORDER) => rl.GetColor(0xFF00FFFF),
+                    @enumToInt(LineType.SNIP_TEXT) => rl.GetColor(0xFFFF00FF),
+                    @enumToInt(LineType.TEXT) => rl.GetColor(0xC6C6C630),
+                    else => rl.GetColor(0x00FF00FF)
+                };
+
+            } else if (zIndex == 3) {
+                cellColor = switch (item) {
+                    @enumToInt(TextType.NONE) => rl.GetColor(0xC6C6C630),
+                    @enumToInt(TextType.MONO_BORDER) => rl.GetColor(0xFF00FFFF),
+                    @enumToInt(TextType.MONO_TEXT) => rl.GetColor(0xFFFF00FF),
+                    else => rl.GetColor(0x00FF00FF)
+                };
+
+            } else if (zIndex == 4) {
+                cellColor = switch (item) {
+                    @enumToInt(TokenFeature.NONE) => rl.GetColor(0xC6C6C630),
+                    @enumToInt(TokenFeature.MONO) => rl.GetColor(0xFF00FFFF),
+                    @enumToInt(TokenFeature.UNDERLINE) => rl.GetColor(0xFFFF00FF),
+                    @enumToInt(TokenFeature.BOLD) => rl.GetColor(0xc40000FF),
+                    @enumToInt(TokenFeature.ITALIC) => rl.GetColor(0x275ac8FF),
+                    @enumToInt(TokenFeature.STRIKE) => rl.GetColor(0x00FF00FF),
+                    @enumToInt(TokenFeature.LINK) => rl.GetColor(0xFF8000FF),
                     else => rl.GetColor(0x00FF00FF)
                 };
             }
@@ -437,15 +462,19 @@ pub fn main() !void {
 
                 if (zIndex == 0 and item != 0) {
                     tooltipText = @tagName(@intToEnum(CharFeature, item));
-                } else if (item == 0 and zIndex == 0) {
-                    tooltipText = "SPACE";
-                }
+                
+                } else if (zIndex == 1) {
+                    tooltipText = @tagName(@intToEnum(BlockFeature, item));
+                
+                } else if (zIndex == 2) {
+                    tooltipText = @tagName(@intToEnum(LineType, item));
+                
+                } else if (zIndex == 3) {
+                    tooltipText = @tagName(@intToEnum(TextType, item));
 
-                if (zIndex == 1)
+                } else if (zIndex == 4) {
                     tooltipText = @tagName(@intToEnum(TokenFeature, item));
-
-                if (zIndex == 2)
-                    tooltipText = @tagName(@intToEnum(LineFeature, item));
+                }
             }
 
             colCount += 1;

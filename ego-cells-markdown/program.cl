@@ -14,26 +14,40 @@
 #define CH_CLOSED_SQR    11
 #define CH_TICK          12
 #define CH_STAR          13
-#define CH_ESCAPE        14
-#define CH_BIGGER_THAN   15
+#define CH_UNDERSCORE    14
+#define CH_ESCAPE        15
+#define CH_BIGGER_THAN   16
 
-#define TK_EMPTY         0
-#define TK_PARAGRAPH     1
-#define TK_HEADING_1     2
-#define TK_HEADING_2     3
-#define TK_HEADING_3     4
-#define TK_HEADING_4     5
-#define TK_HEADING_5     6
-#define TK_HEADING_6     7
-#define TK_UL_ITEM       8
-#define TK_OL_ITEM       9
-#define TK_SNIP_BLOCK    10
+#define BL_EMPTY         0
+#define BL_PARAGRAPH     1
+#define BL_HEADING_1     2
+#define BL_HEADING_2     3
+#define BL_HEADING_3     4
+#define BL_HEADING_4     5
+#define BL_HEADING_5     6
+#define BL_HEADING_6     7
+#define BL_UL_ITEM       8
+#define BL_OL_ITEM       9
+#define BL_SNIP_BLOCK    10
 
 #define LN_EMPTY_LINE    0
-#define LN_HEADING       1
-#define LN_SNIP_BORDER   2
-#define LN_SNIP_TEXT     3
-#define LN_TEXT          4
+#define LN_SNIP_BORDER   1
+#define LN_SNIP_TEXT     2
+#define LN_TEXT          3
+
+#define TX_EMPTY         0
+#define TX_NONE          1
+#define TX_MONO_BORDER   2
+#define TX_MONO_TEXT     3
+
+#define TK_EMPTY         0
+#define TK_NONE          1
+#define TK_MONO          2
+#define TK_UNDERLINE     3
+#define TK_BOLD          4
+#define TK_ITALIC        5
+#define TK_STRIKE        6
+#define TK_LINK          7
 
 #define DSAMP (CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST)
 
@@ -90,8 +104,9 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
     uint4 selfL1 = get_layer_value(in_img, coord, 1);
     uint4 selfL2 = get_layer_value(in_img, coord, 2);
     uint4 selfL3 = get_layer_value(in_img, coord, 3);
+    uint4 selfL4 = get_layer_value(in_img, coord, 4);
+    uint4 selfL5 = get_layer_value(in_img, coord, 5);
 
-    uint4 firstInRowL1 = get_layer_value(in_img, (int2) (0, coord.y), 1);
     uint4 firstInRowL2 = get_layer_value(in_img, (int2) (0, coord.y), 2);
     uint4 firstInRowL3 = get_layer_value(in_img, (int2) (0, coord.y), 3);
 
@@ -104,14 +119,14 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         rightN(in_img, coord, 1, 2).x == CH_TICK
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_BORDER);
-        set_layer_value(out_img, coord, 2, TK_SNIP_BLOCK);
+        set_layer_value(out_img, coord, 2, BL_SNIP_BLOCK);
     }
 
     else if (
         firstInRowL3.x == LN_SNIP_BORDER
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_BORDER);
-        set_layer_value(out_img, coord, 2, TK_SNIP_BLOCK);
+        set_layer_value(out_img, coord, 2, BL_SNIP_BLOCK);
     }
 
     // SNIP CONTENT
@@ -120,7 +135,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         topN(in_img, coord, 3, 1).x == LN_SNIP_BORDER
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_TEXT);
-        set_layer_value(out_img, coord, 2, TK_SNIP_BLOCK);
+        set_layer_value(out_img, coord, 2, BL_SNIP_BLOCK);
     }
 
     else if (
@@ -128,7 +143,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         topN(in_img, coord, 3, 1).x == LN_SNIP_TEXT
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_TEXT);
-        set_layer_value(out_img, coord, 2, TK_SNIP_BLOCK);
+        set_layer_value(out_img, coord, 2, BL_SNIP_BLOCK);
     }
 
     else if (
@@ -136,7 +151,7 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         topN(in_img, coord, 3, 2).x == LN_TEXT
     ) {
         set_layer_value(out_img, coord, 3, LN_SNIP_TEXT);
-        set_layer_value(out_img, coord, 2, TK_SNIP_BLOCK);
+        set_layer_value(out_img, coord, 2, BL_SNIP_BLOCK);
     }
 
     // NON-SNIP CONTENT
@@ -175,36 +190,36 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         selfL1.x == CH_HASH &&
         rightN(in_img, coord, 1, 1).x == CH_SPACE
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_1);
+        set_layer_value(out_img, coord, 2, BL_HEADING_1);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_HEADING_1
+        firstInRowL2.x == BL_HEADING_1
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_1);
+        set_layer_value(out_img, coord, 2, BL_HEADING_1);
     }
 
     // HEADING 2
-    if (
+    else if (
         selfL3.x == LN_TEXT &&
         leftWall &&
         selfL1.x == CH_HASH &&
         rightN(in_img, coord, 1, 1).x == CH_HASH &&
         rightN(in_img, coord, 1, 2).x == CH_SPACE
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_2);
+        set_layer_value(out_img, coord, 2, BL_HEADING_2);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_HEADING_2
+        firstInRowL2.x == BL_HEADING_2
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_2);
+        set_layer_value(out_img, coord, 2, BL_HEADING_2);
     }
 
     // HEADING 3
-    if (
+    else if (
         selfL3.x == LN_TEXT &&
         leftWall &&
         selfL1.x == CH_HASH &&
@@ -212,18 +227,18 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         rightN(in_img, coord, 1, 2).x == CH_HASH &&
         rightN(in_img, coord, 1, 3).x == CH_SPACE
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_3);
+        set_layer_value(out_img, coord, 2, BL_HEADING_3);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_HEADING_3
+        firstInRowL2.x == BL_HEADING_3
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_3);
+        set_layer_value(out_img, coord, 2, BL_HEADING_3);
     }
 
     // HEADING 4
-    if (
+    else if (
         selfL3.x == LN_TEXT &&
         leftWall &&
         selfL1.x == CH_HASH &&
@@ -232,18 +247,18 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         rightN(in_img, coord, 1, 3).x == CH_HASH &&
         rightN(in_img, coord, 1, 4).x == CH_SPACE
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_4);
+        set_layer_value(out_img, coord, 2, BL_HEADING_4);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_HEADING_4
+        firstInRowL2.x == BL_HEADING_4
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_4);
+        set_layer_value(out_img, coord, 2, BL_HEADING_4);
     }
 
     // HEADING 5
-    if (
+    else if (
         selfL3.x == LN_TEXT &&
         leftWall &&
         selfL1.x == CH_HASH &&
@@ -253,18 +268,18 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         rightN(in_img, coord, 1, 4).x == CH_HASH &&
         rightN(in_img, coord, 1, 5).x == CH_SPACE
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_5);
+        set_layer_value(out_img, coord, 2, BL_HEADING_5);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_HEADING_5
+        firstInRowL2.x == BL_HEADING_5
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_5);
+        set_layer_value(out_img, coord, 2, BL_HEADING_5);
     }
 
     // HEADING 6
-    if (
+    else if (
         selfL3.x == LN_TEXT &&
         leftWall &&
         selfL1.x == CH_HASH &&
@@ -275,14 +290,14 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         rightN(in_img, coord, 1, 5).x == CH_HASH &&
         rightN(in_img, coord, 1, 6).x == CH_SPACE
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_6);
+        set_layer_value(out_img, coord, 2, BL_HEADING_6);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_HEADING_6
+        firstInRowL2.x == BL_HEADING_6
     ) {
-        set_layer_value(out_img, coord, 2, TK_HEADING_6);
+        set_layer_value(out_img, coord, 2, BL_HEADING_6);
     }
 
     // PARAGRAPH
@@ -324,14 +339,14 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
             )
         )
     ) {
-        set_layer_value(out_img, coord, 2, TK_PARAGRAPH);
+        set_layer_value(out_img, coord, 2, BL_PARAGRAPH);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_PARAGRAPH
+        firstInRowL2.x == BL_PARAGRAPH
     ) {
-        set_layer_value(out_img, coord, 2, TK_PARAGRAPH);
+        set_layer_value(out_img, coord, 2, BL_PARAGRAPH);
     }
 
     // UNORDERED LIST
@@ -341,14 +356,170 @@ __kernel void markdown(__read_only image3d_t in_img, __write_only image3d_t out_
         selfL1.x == CH_STAR &&
         rightN(in_img, coord, 1, 1).x == CH_SPACE
     ) {
-        set_layer_value(out_img, coord, 2, TK_UL_ITEM);
+        set_layer_value(out_img, coord, 2, BL_UL_ITEM);
     }
 
     else if (
         selfL3.x == LN_TEXT &&
-        firstInRowL2.x == TK_UL_ITEM
+        firstInRowL2.x == BL_UL_ITEM
     ) {
-        set_layer_value(out_img, coord, 2, TK_UL_ITEM);
+        set_layer_value(out_img, coord, 2, BL_UL_ITEM);
+    }
+
+    // P > MONO BORDER
+    if (
+        selfL3.x == LN_TEXT &&
+        selfL1.x == CH_TICK &&
+        leftN(in_img, coord, 1, 1).x != CH_ESCAPE
+    ) {
+        set_layer_value(out_img, coord, 4, TX_MONO_BORDER);
+    }
+
+    // P > MONO TEXT
+    else if (
+        coord.x-2 == -1 && // @TODO: Should I replace this expression with something more formal?
+        selfL1.x != CH_TICK &&
+        leftN(in_img, coord, 4, 1).x == TX_MONO_BORDER
+    ) {
+        set_layer_value(out_img, coord, 4, TX_MONO_TEXT);
+    }
+
+    else if (
+        selfL4.x != TX_MONO_BORDER &&
+        leftN(in_img, coord, 4, 1).x == TX_MONO_TEXT
+    ) {
+        set_layer_value(out_img, coord, 4, TX_MONO_TEXT);
+    }
+
+    else if (
+        leftN(in_img, coord, 4, 1).x == TX_MONO_BORDER &&
+        leftN(in_img, coord, 4, 2).x == TX_NONE
+    ) {
+        set_layer_value(out_img, coord, 4, TX_MONO_TEXT);
+    }
+
+    // P > NONE
+    else if (
+        leftWall && 
+        selfL2.x != BL_EMPTY &&
+        selfL2.x != BL_SNIP_BLOCK &&
+        selfL3.x == LN_TEXT &&
+        selfL1.x != CH_TICK
+    ) {
+        set_layer_value(out_img, coord, 4, TX_NONE);
+    }
+
+    else if (
+        leftN(in_img, coord, 4, 1).x == TX_MONO_BORDER &&
+        leftN(in_img, coord, 4, 2).x == TX_MONO_TEXT
+    ) {
+        set_layer_value(out_img, coord, 4, TX_NONE);
+    }
+
+    else if (
+        selfL4.x != TX_MONO_BORDER &&
+        leftN(in_img, coord, 4, 1).x == TX_NONE
+    ) {
+        set_layer_value(out_img, coord, 4, TX_NONE);
+    }
+
+    // STRIKE
+    if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_CURLY_DASH &&
+        rightN(in_img, coord, 1, 1).x == CH_CURLY_DASH &&
+        rightN(in_img, coord, 1, 2).x != CH_SPACE
+    ) {
+        set_layer_value(out_img, coord, 5, TK_STRIKE);
+        set_layer_value(out_img, right, 5, TK_STRIKE);
+    }
+
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_CURLY_DASH &&
+        leftN(in_img, coord, 1, 2).x != CH_SPACE &&
+        rightN(in_img, coord, 1, 1).x == CH_CURLY_DASH
+    ) {
+        set_layer_value(out_img, coord, 5, TK_STRIKE);
+        set_layer_value(out_img, right, 5, TK_STRIKE);
+    }
+
+    // BOLD
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_STAR &&
+        rightN(in_img, coord, 1, 1).x == CH_STAR &&
+        rightN(in_img, coord, 1, 2).x != CH_SPACE
+    ) {
+        set_layer_value(out_img, coord, 5, TK_BOLD);
+        set_layer_value(out_img, right, 5, TK_BOLD);
+    }
+
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_STAR &&
+        leftN(in_img, coord, 1, 2).x != CH_SPACE &&
+        rightN(in_img, coord, 1, 1).x == CH_STAR
+    ) {
+        set_layer_value(out_img, coord, 5, TK_BOLD);
+        set_layer_value(out_img, right, 5, TK_BOLD);
+    }
+
+    // ITALIC
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_STAR &&
+        rightN(in_img, coord, 1, 1).x != CH_STAR &&
+        leftN(in_img, coord, 1, 1).x != CH_STAR &&
+        rightN(in_img, coord, 1, 1).x != CH_SPACE
+    ) {
+        set_layer_value(out_img, coord, 5, TK_ITALIC);
+    }
+
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_STAR &&
+        leftN(in_img, coord, 1, 2).x != CH_SPACE &&
+        leftN(in_img, coord, 1, 1).x != CH_STAR &&
+        rightN(in_img, coord, 1, 1).x != CH_STAR
+    ) {
+        set_layer_value(out_img, coord, 5, TK_ITALIC);
+    }
+
+    // UNDERLINE
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_UNDERSCORE &&
+        rightN(in_img, coord, 1, 1).x != CH_SPACE
+    ) {
+        set_layer_value(out_img, coord, 5, TK_UNDERLINE);
+    }
+
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_UNDERSCORE &&
+        leftN(in_img, coord, 1, 1).x != CH_SPACE
+    ) {
+        set_layer_value(out_img, coord, 5, TK_UNDERLINE);
+    }
+
+    // LINK PART
+    else if (
+        selfL3.x == LN_TEXT &&
+        selfL4.x == TX_NONE &&
+        selfL1.x == CH_CLOSED_SQR &&
+        rightN(in_img, coord, 1, 1).x == CH_OPEN_PAR
+    ) {
+        set_layer_value(out_img, coord, 5, TK_LINK);
+        set_layer_value(out_img, right, 5, TK_LINK);
     }
 
     // Passing the first layer from in_img to out_img
