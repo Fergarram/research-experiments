@@ -12,7 +12,7 @@ pub fn build(b: *Builder) void {
     exe.setTarget(target); // Used for Raylib
 
     // OpenCL
-    exe.addIncludeDir("./opencl");
+    exe.addIncludePath("./opencl");
     exe.linkSystemLibrary("c");
 
     switch (builtin.os.tag) {

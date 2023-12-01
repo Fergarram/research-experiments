@@ -197,7 +197,7 @@ pub fn main() !void {
     // print("\n", .{});
 
     var device = try ocl.getDeviceId(platformNo, deviceNo);
-    print("Selected device ID: {}\n\n", .{device});
+    print("Selected device ID: {}\n\n", .{device.?});
 
     var ctx = try ocl.createContext(&device);
     defer ocl.releaseContext(ctx);
@@ -385,20 +385,23 @@ pub fn main() !void {
 
         for (cellBuffer3D) |item| {
             if (zIndex == 0) {
-                cellColor = switch (@intToEnum(CharFeature, item)) {
-                    .@"abc", .@"123", .@"sym", .@"." => rl.GetColor(0xC6C6C660),
-                    .@">",
-                    .@"#" => rl.GetColor(0xFF0000FF),
-                    .@"~",
-                    .@"*",
-                    .@"__",
-                    .@"-" => rl.GetColor(0x008000FF),
-                    .@"(",
-                    .@")" => rl.GetColor(0xFF8000FF),
-                    .@"[",
-                    .@"]" => rl.GetColor(0xFFFF00FF),
-                    .@"`" => rl.GetColor(0x008080FF),
-                    .@"\\" => rl.GetColor(0x0000FFFF),
+                cellColor = switch (item) {
+                    @enumToInt(CharFeature.@"abc"),
+                    @enumToInt(CharFeature.@"123"),
+                    @enumToInt(CharFeature.@"sym"),
+                    @enumToInt(CharFeature.@".") => rl.GetColor(0xC6C6C660),
+                    @enumToInt(CharFeature.@">"),
+                    @enumToInt(CharFeature.@"#") => rl.GetColor(0xFF0000FF),
+                    @enumToInt(CharFeature.@"~"),
+                    @enumToInt(CharFeature.@"*"),
+                    @enumToInt(CharFeature.@"__"),
+                    @enumToInt(CharFeature.@"-") => rl.GetColor(0x008000FF),
+                    @enumToInt(CharFeature.@"("),
+                    @enumToInt(CharFeature.@")") => rl.GetColor(0xFF8000FF),
+                    @enumToInt(CharFeature.@"["),
+                    @enumToInt(CharFeature.@"]") => rl.GetColor(0xFFFF00FF),
+                    @enumToInt(CharFeature.@"`") => rl.GetColor(0x008080FF),
+                    @enumToInt(CharFeature.@"\\") => rl.GetColor(0x0000FFFF),
                     else => rl.GetColor(0x00FF00FF)
                 };
 
@@ -460,21 +463,21 @@ pub fn main() !void {
             if (mouseX == colCount and (mouseY + (zIndex * 128)) == rowCount) {
                 currentCellVal = @intCast(c_int, item);
 
-                if (zIndex == 0 and item != 0) {
-                    tooltipText = @tagName(@intToEnum(CharFeature, item));
+                // if (zIndex == 0 and item != 0) {
+                //     tooltipText = @tagName(@intToEnum(CharFeature, item));
                 
-                } else if (zIndex == 1) {
-                    tooltipText = @tagName(@intToEnum(BlockFeature, item));
+                // } else if (zIndex == 1) {
+                //     tooltipText = @tagName(@intToEnum(BlockFeature, item));
                 
-                } else if (zIndex == 2) {
-                    tooltipText = @tagName(@intToEnum(LineType, item));
+                // } else if (zIndex == 2) {
+                //     tooltipText = @tagName(@intToEnum(LineType, item));
                 
-                } else if (zIndex == 3) {
-                    tooltipText = @tagName(@intToEnum(TextType, item));
+                // } else if (zIndex == 3) {
+                //     tooltipText = @tagName(@intToEnum(TextType, item));
 
-                } else if (zIndex == 4) {
-                    tooltipText = @tagName(@intToEnum(TokenFeature, item));
-                }
+                // } else if (zIndex == 4) {
+                //     tooltipText = @tagName(@intToEnum(TokenFeature, item));
+                // }
             }
 
             colCount += 1;
