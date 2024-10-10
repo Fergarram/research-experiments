@@ -1,9 +1,15 @@
 const std = @import("std");
 const ocl = @import("ocl.zig");
 const rl = @import("raylib");
+const builtin = @import("builtin");
 
+const assert = std.debug.assert;
 const print = std.debug.print;
 const ascii = std.ascii;
+const mem = std.mem;
+const Allocator = mem.Allocator;
+
+pub const io_mode = .evented;
 
 const TokenFeature = enum(u8) {
     EMPTY,
@@ -29,7 +35,6 @@ const LineType = enum(u8) {
     SNIP_TEXT,
     TEXT,
 };
-
 
 const BlockFeature = enum(u8) {
     EMPTY,
@@ -88,6 +93,8 @@ const Cell = struct {
 };
 
 const markdownString = @embedFile("./markdown.md");
+
+// @TODO: Watch file for changes
 const cellProgramSource = @embedFile("./program.cl");
 
 var cellMatrix: [128][128]?Cell = undefined;
@@ -196,6 +203,33 @@ pub fn main() !void {
 
     // print("\n", .{});
 
+    // {
+    //     // assert(std.io.is_async);
+    //     // assert(!builtin.single_threaded);
+
+    //     const allocator = std.heap.page_allocator;
+        
+    //     const sourcePath = try std.fs.path.join(allocator, &[_][]const u8{ "program.cl" });
+    //     defer allocator.free(sourcePath);
+        
+    //     const readContents = try std.fs.cwd().readFileAlloc(allocator, sourcePath, 1024 * 1024);
+    //     defer allocator.free(readContents);
+
+    //     // print("{s}\n", .{readContents});
+
+    //     var watch = try std.fs.Watch(void).init(allocator, 0);
+    //     defer watch.deinit();
+
+    //     // try watch.addFile(sourcePath, {});
+
+    //     // var ev = async watch.channel.get();
+    //     // var ev_consumed = false;
+    //     // defer if (!ev_consumed) {
+    //     //     _ = await ev;
+    //     //     print("We here\n", .{});
+    //     // };
+    // }
+
     var device = try ocl.getDeviceId(platformNo, deviceNo);
     print("Selected device ID: {}\n\n", .{device});
 
@@ -210,8 +244,8 @@ pub fn main() !void {
 
     try ocl.buildProgramForDevice(program, &device);
 
-    var kernel = try ocl.createKernel(program, "markdown");
-    defer ocl.releaseKernel(kernel);
+    var markdownKernel = try ocl.createKernel(program, "markdown");
+    defer ocl.releaseKernel(markdownKernel);
 
     var imageFormat = ocl.CLImageFormat{
         .order = @enumToInt(ocl.CLChannelOrder.R),
@@ -253,13 +287,13 @@ pub fn main() !void {
         &cellBuffer3D
     );
 
-    try ocl.setKernelArg(kernel, 0, &firstVolume);
-    try ocl.setKernelArg(kernel, 1, &secondVolume);
+    try ocl.setKernelArg(markdownKernel, 0, &firstVolume);
+    try ocl.setKernelArg(markdownKernel, 1, &secondVolume);
 
     // So this will NOT start the command immediately
     try ocl.enqueueNDRangeKernelWithoutEvents(
         commandQueue,
-        kernel,
+        markdownKernel,
         3,
         [3]usize{128,128,5},
         null
@@ -280,6 +314,9 @@ pub fn main() !void {
         u8,
         &cellBuffer3D
     );
+
+    // @TODO: Add an event listener that reacts to changes to the DNA file.
+    //        - Set a variable that responds to it i.e. dnaNeedsCompile
 
     const GRID_SIZE = 6;
     const UIWidth = 300;
@@ -320,16 +357,23 @@ pub fn main() !void {
         if (mouseY >= 127) mouseY = 127;
 
         if (rl.IsKeyDown(.KEY_RIGHT)) {
+
+            // @TODO: Load new DNA source and compile to kernel
+            // @OPTIM: Only compile into kernel if there was a change in the DNA source.
+            // if (dnaNeedsCompile) ...
+            //     Compile...
+            //     dnaNeedsCompile = false;
+
             // Swap volumes
             var inVolPtr = if (!currentInputVolume) &secondVolume else &firstVolume;
             var outVolPtr = if (!currentInputVolume) &firstVolume else &secondVolume;
-            try ocl.setKernelArg(kernel, 0, inVolPtr);
-            try ocl.setKernelArg(kernel, 1, outVolPtr);
+            try ocl.setKernelArg(markdownKernel, 0, inVolPtr);
+            try ocl.setKernelArg(markdownKernel, 1, outVolPtr);
 
             // Add program execution to queue
             try ocl.enqueueNDRangeKernelWithoutEvents(
                 commandQueue,
-                kernel,
+                markdownKernel,
                 3,
                 [3]usize{128,128,5},
                 null
@@ -385,20 +429,23 @@ pub fn main() !void {
 
         for (cellBuffer3D) |item| {
             if (zIndex == 0) {
-                cellColor = switch (@intToEnum(CharFeature, item)) {
-                    .@"abc", .@"123", .@"sym", .@"." => rl.GetColor(0xC6C6C660),
-                    .@">",
-                    .@"#" => rl.GetColor(0xFF0000FF),
-                    .@"~",
-                    .@"*",
-                    .@"__",
-                    .@"-" => rl.GetColor(0x008000FF),
-                    .@"(",
-                    .@")" => rl.GetColor(0xFF8000FF),
-                    .@"[",
-                    .@"]" => rl.GetColor(0xFFFF00FF),
-                    .@"`" => rl.GetColor(0x008080FF),
-                    .@"\\" => rl.GetColor(0x0000FFFF),
+                cellColor = switch (item) {
+                    @enumToInt(CharFeature.@"abc"),
+                    @enumToInt(CharFeature.@"123"),
+                    @enumToInt(CharFeature.@"sym"),
+                    @enumToInt(CharFeature.@".") => rl.GetColor(0xC6C6C630),
+                    @enumToInt(CharFeature.@">"),
+                    @enumToInt(CharFeature.@"#") => rl.GetColor(0xFF0000FF),
+                    @enumToInt(CharFeature.@"~"),
+                    @enumToInt(CharFeature.@"*"),
+                    @enumToInt(CharFeature.@"__"),
+                    @enumToInt(CharFeature.@"-") => rl.GetColor(0x008000FF),
+                    @enumToInt(CharFeature.@"("),
+                    @enumToInt(CharFeature.@")") => rl.GetColor(0xFF8000FF),
+                    @enumToInt(CharFeature.@"["),
+                    @enumToInt(CharFeature.@"]") => rl.GetColor(0xFFFF00FF),
+                    @enumToInt(CharFeature.@"`") => rl.GetColor(0x008080FF),
+                    @enumToInt(CharFeature.@"\\") => rl.GetColor(0x0000FFFF),
                     else => rl.GetColor(0x00FF00FF)
                 };
 
@@ -459,21 +506,27 @@ pub fn main() !void {
 
             if (mouseX == colCount and (mouseY + (zIndex * 128)) == rowCount) {
                 currentCellVal = @intCast(c_int, item);
+                var itemClean = @intCast(u8, item);
 
                 if (zIndex == 0 and item != 0) {
-                    tooltipText = @tagName(@intToEnum(CharFeature, item));
+                    var typeName = @intToEnum(CharFeature, itemClean);
+                    tooltipText = @tagName(typeName);
                 
                 } else if (zIndex == 1) {
-                    tooltipText = @tagName(@intToEnum(BlockFeature, item));
+                    var typeName = @intToEnum(BlockFeature, itemClean);
+                    tooltipText = @tagName(typeName);
                 
                 } else if (zIndex == 2) {
-                    tooltipText = @tagName(@intToEnum(LineType, item));
+                    var typeName = @intToEnum(LineType, itemClean);
+                    tooltipText = @tagName(typeName);
                 
                 } else if (zIndex == 3) {
-                    tooltipText = @tagName(@intToEnum(TextType, item));
+                    var typeName = @intToEnum(TextType, itemClean);
+                    tooltipText = @tagName(typeName);
 
                 } else if (zIndex == 4) {
-                    tooltipText = @tagName(@intToEnum(TokenFeature, item));
+                    var typeName = @intToEnum(TokenFeature, itemClean);
+                    tooltipText = @tagName(typeName);
                 }
             }
 
